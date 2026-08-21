@@ -629,27 +629,67 @@ function updateHUD(correctCount = 0) {
   hudTexture.needsUpdate = true;
 }
 
-// --- Shuffling and Dynamic Reflection ---
+// --- Shuffling, Jumbling, and Holographic Forming Animation ---
+let isForming = false;
+let formTimer = 0;
+const FORM_DURATION = 0.9;
+let lastPermutationKey = '';
+
+function generateJumbledIndices() {
+  const n = PARTS.length;
+  let indices;
+  let attempts = 0;
+
+  do {
+    indices = Array.from({ length: n }, (_, i) => i);
+    // Fisher-Yates shuffle
+    for (let i = n - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [indices[i], indices[j]] = [indices[j], indices[i]];
+    }
+
+    // Count how many pieces are by pure chance in their correct target slot
+    let correctCount = 0;
+    for (let i = 0; i < n; i++) {
+      if (indices[i] === PARTS[i].targetSlot) correctCount++;
+    }
+
+    const key = indices.join(',');
+    // Ensure: (1) at most 2 accidentally correct, and (2) different from previous shuffle
+    if (correctCount <= 2 && key !== lastPermutationKey) {
+      lastPermutationKey = key;
+      break;
+    }
+    attempts++;
+  } while (attempts < 60);
+
+  return indices;
+}
+
+function triggerFormingAnimation() {
+  isForming = true;
+  formTimer = 0;
+  holoGridGroup.scale.set(0.001, 0.001, 0.001);
+  frameMat.emissiveIntensity = 2.5;
+
+  for (let i = 0; i < allPartMeshes.length; i++) {
+    const mesh = allPartMeshes[i];
+    mesh.userData.spawnDelay = i * 0.045; // Staggered entry
+    mesh.scale.set(0.001, 0.001, 0.001);
+    mesh.position.y = mesh.userData.targetPos.y + 0.35;
+    if (mesh.material && mesh.material.emissive) {
+      mesh.material.emissive.setHex(0x00e5ff);
+      mesh.material.emissiveIntensity = 2.0;
+    }
+    if (mesh.userData.label) {
+      mesh.userData.label.scale.set(0.001, 0.001, 0.001);
+    }
+  }
+}
+
 function shuffleAndAssign() {
   gameState = 'playing';
-  // Create randomized permutation of slot indices [0..10]
-  const indices = Array.from({ length: PARTS.length }, (_, i) => i);
-  // Fisher-Yates
-  for (let i = indices.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [indices[i], indices[j]] = [indices[j], indices[i]];
-  }
-
-  // Ensure it's not completely solved on start
-  let matches = 0;
-  for (let i = 0; i < PARTS.length; i++) {
-    if (indices[i] === PARTS[i].targetSlot) matches++;
-  }
-  if (matches >= 9) {
-    // swap two elements
-    [indices[0], indices[1]] = [indices[1], indices[0]];
-  }
-
+  const indices = generateJumbledIndices();
   slotOccupants = new Array(SLOT_POSITIONS.length).fill(null);
 
   for (let i = 0; i < allPartMeshes.length; i++) {
@@ -662,6 +702,7 @@ function shuffleAndAssign() {
   }
 
   updateMannequinReflection();
+  triggerFormingAnimation();
 }
 
 function updateMannequinReflection() {
@@ -705,7 +746,7 @@ function updateMannequinReflection() {
   updateHUD(correctCount);
 }
 
-// Initial Shuffle
+// Initial Shuffle & Materialization
 shuffleAndAssign();
 
 // --- Drag & Drop / Swapping State ---
@@ -951,23 +992,85 @@ function animate() {
   // Glowing pulse on holographic grid lines and outer edges
   majorGridMat.opacity = 0.75 + Math.sin(t * 3.0) * 0.2;
   borderWireMat.opacity = 0.85 + Math.sin(t * 3.0) * 0.15;
-  frameMat.emissiveIntensity = 0.6 + Math.sin(t * 3.0) * 0.3;
+  frameMat.emissiveIntensity = isForming ? frameMat.emissiveIntensity : (0.6 + Math.sin(t * 3.0) * 0.3);
 
-  // Update part positions (smooth glide to targetPos when not grabbed)
-  for (const mesh of allPartMeshes) {
-    if (!mesh.userData.isGrabbed) {
-      // Sync Y with floating platform
-      mesh.userData.targetPos.y =
-        holoGridGroup.position.y + 0.015 + mesh.userData.halfH;
-      mesh.position.lerp(mesh.userData.targetPos, 0.18);
+  if (isForming) {
+    formTimer += dt;
+    // Grid expansion ease
+    const gridP = Math.min(1, formTimer / 0.35);
+    const gridEase = Math.sin((gridP * Math.PI) / 2);
+    holoGridGroup.scale.set(gridEase, gridEase, gridEase);
+    frameMat.emissiveIntensity = 0.6 + (1 - gridP) * 2.0;
+
+    // Staggered materialization for each suit component
+    let allFinished = true;
+    for (let i = 0; i < allPartMeshes.length; i++) {
+      const mesh = allPartMeshes[i];
+      const delay = mesh.userData.spawnDelay;
+      if (formTimer < delay) {
+        mesh.scale.set(0.001, 0.001, 0.001);
+        if (mesh.userData.label) mesh.userData.label.scale.set(0.001, 0.001, 0.001);
+        allFinished = false;
+        continue;
+      }
+      const itemTimer = formTimer - delay;
+      const itemDuration = 0.35;
+      const itemP = Math.min(1, itemTimer / itemDuration);
+      const itemEase = Math.sin((itemP * Math.PI) / 2);
+      const scaleVal = Math.min(1, itemP * 1.15);
+      mesh.scale.set(scaleVal, scaleVal, scaleVal);
+
+      if (mesh.userData.label) {
+        mesh.userData.label.scale.set(scaleVal, scaleVal, scaleVal);
+        mesh.userData.label.position.set(
+          mesh.position.x,
+          mesh.position.y + mesh.userData.halfH + 0.065,
+          mesh.position.z
+        );
+      }
+
+      // Drop smoothly from +0.35m
+      const targetY = holoGridGroup.position.y + 0.015 + mesh.userData.halfH;
+      mesh.position.y = THREE.MathUtils.lerp(targetY + 0.35, targetY, itemEase);
+      mesh.position.x = mesh.userData.targetPos.x;
+      mesh.position.z = mesh.userData.targetPos.z;
+
+      // Flare fade
+      if (mesh.material && mesh.material.emissive) {
+        mesh.material.emissiveIntensity = Math.max(0, 2.0 * (1 - itemP));
+        if (itemP >= 1) mesh.material.emissive.setHex(0x000000);
+      }
+
+      if (itemP < 1) allFinished = false;
     }
-    // Update floating label position
-    if (mesh.userData.label) {
-      mesh.userData.label.position.set(
-        mesh.position.x,
-        mesh.position.y + mesh.userData.halfH + 0.065,
-        mesh.position.z
-      );
+
+    if (formTimer >= FORM_DURATION && allFinished) {
+      isForming = false;
+      holoGridGroup.scale.set(1, 1, 1);
+      for (const mesh of allPartMeshes) {
+        mesh.scale.set(1, 1, 1);
+        if (mesh.userData.label) mesh.userData.label.scale.set(1, 1, 1);
+        if (mesh.material && mesh.material.emissive) {
+          mesh.material.emissive.setHex(0x000000);
+          mesh.material.emissiveIntensity = 0;
+        }
+      }
+    }
+  } else {
+    // Normal update part positions (smooth glide to targetPos when not grabbed)
+    for (const mesh of allPartMeshes) {
+      if (!mesh.userData.isGrabbed) {
+        mesh.userData.targetPos.y =
+          holoGridGroup.position.y + 0.015 + mesh.userData.halfH;
+        mesh.position.lerp(mesh.userData.targetPos, 0.18);
+      }
+      if (mesh.userData.label) {
+        mesh.userData.label.position.set(
+          mesh.position.x,
+          mesh.position.y + mesh.userData.halfH + 0.065,
+          mesh.position.z
+        );
+      }
     }
   }
 
