@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EOD Suit Trainer</title>
+    <style>
+      body { margin: 0; overflow: hidden; font-family: sans-serif; }
+      #enter {
+        position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        padding: 16px 32px; font-size: 20px; background: #2f6f4f; color: white;
+        border: none; border-radius: 8px; cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <button id="enter">ENTER VR</button>
+    <script type="module">
+      import { VRButton } from './src/vrbutton.js';
+      import './src/main.js';
+      document.getElementById('enter').replaceWith(VRButton.createButton());
+    </script>
+  </body>
+</html>
