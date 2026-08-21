@@ -164,22 +164,103 @@ for (const part of PARTS) {
   mesh.userData.label = label;
 }
 
-// 3D Reset Button on table corner
-const resetGroup = new THREE.Group();
-resetGroup.position.set(table.position.x + 0.52, tableTopY + 0.02, table.position.z + 0.28);
-scene.add(resetGroup);
+function createButtonTexture(text, bg = '#d23232') {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 192;
+  const ctx = canvas.getContext('2d');
 
-const resetBtn = new THREE.Mesh(
-  new THREE.BoxGeometry(0.16, 0.03, 0.08),
-  new THREE.MeshStandardMaterial({ color: 0xcc2222, roughness: 0.3, metalness: 0.1 })
+  ctx.fillStyle = bg;
+  const r = 36;
+  ctx.beginPath();
+  ctx.moveTo(r, 6);
+  ctx.lineTo(512 - r, 6);
+  ctx.quadraticCurveTo(512 - 6, 6, 512 - 6, r);
+  ctx.lineTo(512 - 6, 192 - r);
+  ctx.quadraticCurveTo(512 - 6, 192 - 6, 512 - r, 192 - 6);
+  ctx.lineTo(r, 192 - 6);
+  ctx.quadraticCurveTo(6, 192 - 6, 6, 192 - r);
+  ctx.lineTo(6, r);
+  ctx.quadraticCurveTo(6, 6, r, 6);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+  ctx.lineWidth = 8;
+  ctx.stroke();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 68px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, 256, 96);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearFilter;
+  return texture;
+}
+
+const hudCanvas = document.createElement('canvas');
+hudCanvas.width = 1024;
+hudCanvas.height = 256;
+const hudCtx = hudCanvas.getContext('2d');
+const hudTexture = new THREE.CanvasTexture(hudCanvas);
+const hud = new THREE.Mesh(
+  new THREE.PlaneGeometry(1.6, 0.4),
+  new THREE.MeshBasicMaterial({ map: hudTexture, transparent: true })
 );
-resetBtn.position.y = 0.015;
-resetBtn.userData.isReset = true;
-resetGroup.add(resetBtn);
+hud.position.set(0, 2.2, -2.6);
+scene.add(hud);
 
-const resetLabel = createBadge('↺ RESET', 0.15, 0.045);
-resetLabel.position.set(0, 0.07, 0);
-resetGroup.add(resetLabel);
+// Floating 3D Reset Button right next to the Lives section on the HUD
+const resetBtn = new THREE.Mesh(
+  new THREE.BoxGeometry(0.28, 0.10, 0.03),
+  new THREE.MeshStandardMaterial({
+    map: createButtonTexture('↺ RESET'),
+    roughness: 0.3,
+    metalness: 0.1,
+  })
+);
+resetBtn.position.set(0.56, -0.06, 0.02);
+resetBtn.userData.isReset = true;
+hud.add(resetBtn);
+
+function updateHUD() {
+  hudCtx.clearRect(0, 0, 1024, 256);
+  hudCtx.fillStyle = 'rgba(0,0,0,0.75)';
+  hudCtx.fillRect(0, 0, 1024, 256);
+
+  if (gameState === 'won') {
+    hudCtx.textAlign = 'center';
+    hudCtx.fillStyle = '#44ff66';
+    hudCtx.font = 'bold 64px sans-serif';
+    hudCtx.fillText('SUIT COMPLETE — WELL DONE', 450, 105);
+    hudCtx.fillStyle = '#ffffff';
+    hudCtx.font = '36px sans-serif';
+    hudCtx.fillText('Select RESET button to restart', 450, 175);
+  } else if (gameState === 'lost') {
+    hudCtx.textAlign = 'center';
+    hudCtx.fillStyle = '#ff4444';
+    hudCtx.font = 'bold 64px sans-serif';
+    hudCtx.fillText('TRAINING FAILED', 450, 90);
+    hudCtx.fillStyle = '#ffffff';
+    hudCtx.font = '36px sans-serif';
+    hudCtx.fillText(`Reached step ${stepIndex + 1} of ${PARTS.length}`, 450, 150);
+    hudCtx.fillStyle = '#ffbbbb';
+    hudCtx.font = 'bold 30px sans-serif';
+    hudCtx.fillText('Select RESET button to try again', 450, 205);
+  } else {
+    hudCtx.textAlign = 'center';
+    hudCtx.fillStyle = '#ffffff';
+    hudCtx.font = 'bold 50px sans-serif';
+    hudCtx.fillText(`Step ${stepIndex + 1}/${PARTS.length}: ${PARTS[stepIndex].name}`, 450, 95);
+
+    hudCtx.textAlign = 'center';
+    hudCtx.font = '42px sans-serif';
+    hudCtx.fillText('Lives: ' + '\u2665'.repeat(lives) + '\u2661'.repeat(LIVES - lives), 420, 180);
+  }
+  hudTexture.needsUpdate = true;
+}
 
 const raycaster = new THREE.Raycaster();
 const controllers = [];
@@ -346,49 +427,6 @@ function flashRed(mesh) {
   setTimeout(() => mesh.material.color.setHex(orig), 400);
 }
 
-const hudCanvas = document.createElement('canvas');
-hudCanvas.width = 1024;
-hudCanvas.height = 256;
-const hudCtx = hudCanvas.getContext('2d');
-const hudTexture = new THREE.CanvasTexture(hudCanvas);
-const hud = new THREE.Mesh(
-  new THREE.PlaneGeometry(1.6, 0.4),
-  new THREE.MeshBasicMaterial({ map: hudTexture, transparent: true })
-);
-hud.position.set(0, 2.2, -2.6);
-scene.add(hud);
-
-function updateHUD() {
-  hudCtx.clearRect(0, 0, 1024, 256);
-  hudCtx.fillStyle = 'rgba(0,0,0,0.75)';
-  hudCtx.fillRect(0, 0, 1024, 256);
-  hudCtx.textAlign = 'center';
-  if (gameState === 'won') {
-    hudCtx.fillStyle = '#44ff66';
-    hudCtx.font = 'bold 64px sans-serif';
-    hudCtx.fillText('SUIT COMPLETE — WELL DONE', 512, 105);
-    hudCtx.fillStyle = '#ffffff';
-    hudCtx.font = '36px sans-serif';
-    hudCtx.fillText('Click RESET button on table to restart', 512, 175);
-  } else if (gameState === 'lost') {
-    hudCtx.fillStyle = '#ff4444';
-    hudCtx.font = 'bold 64px sans-serif';
-    hudCtx.fillText('TRAINING FAILED', 512, 90);
-    hudCtx.fillStyle = '#ffffff';
-    hudCtx.font = '36px sans-serif';
-    hudCtx.fillText(`Reached step ${stepIndex + 1} of ${PARTS.length}`, 512, 150);
-    hudCtx.fillStyle = '#ffbbbb';
-    hudCtx.font = 'bold 32px sans-serif';
-    hudCtx.fillText('Click RESET button on table to try again', 512, 205);
-  } else {
-    hudCtx.fillStyle = '#ffffff';
-    hudCtx.font = 'bold 50px sans-serif';
-    hudCtx.fillText(`Step ${stepIndex + 1}/${PARTS.length}: ${PARTS[stepIndex].name}`, 512, 95);
-    hudCtx.font = '42px sans-serif';
-    hudCtx.fillText('Lives: ' + '\u2665'.repeat(lives) + '\u2661'.repeat(LIVES - lives), 512, 180);
-  }
-  hudTexture.needsUpdate = true;
-}
 updateHUD();
 
 const clock = new THREE.Clock();
