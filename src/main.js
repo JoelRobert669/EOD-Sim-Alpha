@@ -110,20 +110,21 @@ const holoGridGroup = new THREE.Group();
 holoGridGroup.position.copy(gridOrigin);
 scene.add(holoGridGroup);
 
-const GRID_W = 1.40;
-const GRID_D = 0.84;
+const GRID_W = 1.44;
+const GRID_D = 0.88;
 const GRID_H = 0.015;
 
 // 1. Underlying Translucent Cyber Base Slab
 const holoBaseSlab = new THREE.Mesh(
   new THREE.BoxGeometry(GRID_W, GRID_H, GRID_D),
   new THREE.MeshStandardMaterial({
-    color: 0x030d22,
+    color: 0x020a1c,
     transparent: true,
-    opacity: 0.82,
-    roughness: 0.15,
-    metalness: 0.85,
+    opacity: 0.88,
+    roughness: 0.1,
+    metalness: 0.9,
     emissive: 0x01132b,
+    emissiveIntensity: 0.5,
   })
 );
 holoBaseSlab.position.y = 0;
@@ -133,14 +134,13 @@ holoGridGroup.add(holoBaseSlab);
 const frameMat = new THREE.MeshStandardMaterial({
   color: 0x021c3d,
   emissive: 0x00e5ff,
-  emissiveIntensity: 0.7,
+  emissiveIntensity: 0.9,
   roughness: 0.2,
   metalness: 0.8,
 });
 
-// Perimeter rail edges
-const railThickness = 0.012;
-const railHeight = 0.018;
+const railThickness = 0.014;
+const railHeight = 0.020;
 
 // Front & Back rails
 for (const rz of [-GRID_D / 2, GRID_D / 2]) {
@@ -162,17 +162,18 @@ for (const rx of [-GRID_W / 2, GRID_W / 2]) {
   holoGridGroup.add(rail);
 }
 
-// 3. Razor-Sharp 3D Vector Grid Lines
+// 3. High-Contrast 3D Vector Grid Lines & Intersection Nodes
 const minorPoints = [];
 const majorPoints = [];
+const nodePoints = [];
 
-const stepX = 0.07;
-const stepZ = 0.07;
+const stepX = 0.08;
+const stepZ = 0.09;
 const halfW = GRID_W / 2;
 const halfD = GRID_D / 2;
 const lineY = GRID_H / 2 + 0.002;
 
-// Vertical grid lines (along Z)
+// Vertical lines (along Z)
 let colIdx = 0;
 for (let x = -halfW; x <= halfW + 0.001; x += stepX) {
   const isMajor = colIdx % 2 === 0;
@@ -181,7 +182,7 @@ for (let x = -halfW; x <= halfW + 0.001; x += stepX) {
   colIdx++;
 }
 
-// Horizontal grid lines (along X)
+// Horizontal lines (along X)
 let rowIdx = 0;
 for (let z = -halfD; z <= halfD + 0.001; z += stepZ) {
   const isMajor = rowIdx % 2 === 0;
@@ -190,11 +191,18 @@ for (let z = -halfD; z <= halfD + 0.001; z += stepZ) {
   rowIdx++;
 }
 
+// Node points at major intersections
+for (let x = -halfW; x <= halfW + 0.001; x += stepX * 2) {
+  for (let z = -halfD; z <= halfD + 0.001; z += stepZ * 2) {
+    nodePoints.push(new THREE.Vector3(x, lineY + 0.001, z));
+  }
+}
+
 // Minor grid lines
 const minorGridMat = new THREE.LineBasicMaterial({
-  color: 0x0077b6,
+  color: 0x0088dd,
   transparent: true,
-  opacity: 0.45,
+  opacity: 0.65,
 });
 const minorGrid = new THREE.LineSegments(
   new THREE.BufferGeometry().setFromPoints(minorPoints),
@@ -204,9 +212,9 @@ holoGridGroup.add(minorGrid);
 
 // Major grid lines
 const majorGridMat = new THREE.LineBasicMaterial({
-  color: 0x00e5ff,
+  color: 0x00ffff,
   transparent: true,
-  opacity: 0.85,
+  opacity: 1.0,
 });
 const majorGrid = new THREE.LineSegments(
   new THREE.BufferGeometry().setFromPoints(majorPoints),
@@ -236,19 +244,51 @@ const borderWire = new THREE.LineSegments(
 );
 holoGridGroup.add(borderWire);
 
+// Glowing Particle Sprites Helper
+function createGlowParticleTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 64;
+  canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
+  grad.addColorStop(0.25, 'rgba(0, 229, 255, 0.85)');
+  grad.addColorStop(0.6, 'rgba(0, 119, 255, 0.35)');
+  grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 64, 64);
+  const texture = new THREE.CanvasTexture(canvas);
+  return texture;
+}
+const particleTexture = createGlowParticleTexture();
+
+// Grid Node Points
+const nodeGeo = new THREE.BufferGeometry().setFromPoints(nodePoints);
+const nodeMat = new THREE.PointsMaterial({
+  color: 0x00ffff,
+  size: 0.022,
+  map: particleTexture,
+  transparent: true,
+  opacity: 0.9,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+});
+const gridNodes = new THREE.Points(nodeGeo, nodeMat);
+holoGridGroup.add(gridNodes);
+
 // 4. Cyber Corner Brackets
 function createCornerBracket(x, z, rotY) {
   const bracketGroup = new THREE.Group();
   const bMat = new THREE.MeshStandardMaterial({
     color: 0x00ffff,
     emissive: 0x00ffff,
-    emissiveIntensity: 0.9,
+    emissiveIntensity: 1.2,
   });
-  const armLen = 0.06;
-  const armThick = 0.006;
-  const arm1 = new THREE.Mesh(new THREE.BoxGeometry(armLen, 0.005, armThick), bMat);
+  const armLen = 0.07;
+  const armThick = 0.007;
+  const arm1 = new THREE.Mesh(new THREE.BoxGeometry(armLen, 0.006, armThick), bMat);
   arm1.position.set(armLen / 2, lineY + 0.003, 0);
-  const arm2 = new THREE.Mesh(new THREE.BoxGeometry(armThick, 0.005, armLen), bMat);
+  const arm2 = new THREE.Mesh(new THREE.BoxGeometry(armThick, 0.006, armLen), bMat);
   arm2.position.set(0, lineY + 0.003, armLen / 2);
   bracketGroup.add(arm1, arm2);
   bracketGroup.position.set(x, 0, z);
@@ -260,7 +300,81 @@ holoGridGroup.add(createCornerBracket(halfW - 0.01, -halfD + 0.01, -Math.PI / 2)
 holoGridGroup.add(createCornerBracket(halfW - 0.01, halfD - 0.01, Math.PI));
 holoGridGroup.add(createCornerBracket(-halfW + 0.01, halfD - 0.01, Math.PI / 2));
 
-// --- Holographic Slot Pads (11 Slots) ---
+// --- Ambient Holographic Particle Stream (FX) ---
+const NUM_AMBIENT_PARTICLES = 350;
+const ambientPositions = new Float32Array(NUM_AMBIENT_PARTICLES * 3);
+const ambientVelocities = new Float32Array(NUM_AMBIENT_PARTICLES * 3);
+
+for (let i = 0; i < NUM_AMBIENT_PARTICLES; i++) {
+  ambientPositions[i * 3 + 0] = (Math.random() - 0.5) * GRID_W * 0.95;
+  ambientPositions[i * 3 + 1] = Math.random() * 1.3;
+  ambientPositions[i * 3 + 2] = (Math.random() - 0.5) * GRID_D * 0.95;
+
+  ambientVelocities[i * 3 + 0] = (Math.random() - 0.5) * 0.02;
+  ambientVelocities[i * 3 + 1] = 0.08 + Math.random() * 0.16; // upward speed
+  ambientVelocities[i * 3 + 2] = (Math.random() - 0.5) * 0.02;
+}
+
+const ambientGeo = new THREE.BufferGeometry();
+ambientGeo.setAttribute('position', new THREE.BufferAttribute(ambientPositions, 3));
+const ambientMat = new THREE.PointsMaterial({
+  color: 0x38bdf8,
+  size: 0.028,
+  map: particleTexture,
+  transparent: true,
+  opacity: 0.75,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+});
+const ambientParticleSystem = new THREE.Points(ambientGeo, ambientMat);
+holoGridGroup.add(ambientParticleSystem);
+
+// --- Dynamic Interactive Spark Explosions (FX) ---
+const MAX_SPARKS = 200;
+const sparkPositions = new Float32Array(MAX_SPARKS * 3);
+const sparkVelocities = new Float32Array(MAX_SPARKS * 3);
+const sparkLifetimes = new Float32Array(MAX_SPARKS); // remaining life in seconds
+let sparkCursor = 0;
+
+for (let i = 0; i < MAX_SPARKS; i++) {
+  sparkPositions[i * 3 + 1] = -100;
+}
+
+const sparkGeo = new THREE.BufferGeometry();
+sparkGeo.setAttribute('position', new THREE.BufferAttribute(sparkPositions, 3));
+const sparkMat = new THREE.PointsMaterial({
+  color: 0x00ffff,
+  size: 0.035,
+  map: particleTexture,
+  transparent: true,
+  opacity: 0.95,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+});
+const sparkSystem = new THREE.Points(sparkGeo, sparkMat);
+scene.add(sparkSystem);
+
+function spawnSparks(worldPos, count = 30, colorHex = 0x00ffff) {
+  sparkMat.color.setHex(colorHex);
+  for (let i = 0; i < count; i++) {
+    const idx = (sparkCursor + i) % MAX_SPARKS;
+    sparkPositions[idx * 3 + 0] = worldPos.x;
+    sparkPositions[idx * 3 + 1] = worldPos.y;
+    sparkPositions[idx * 3 + 2] = worldPos.z;
+
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 0.4 + Math.random() * 0.8;
+    const upSpeed = 0.3 + Math.random() * 0.8;
+    sparkVelocities[idx * 3 + 0] = Math.cos(angle) * speed;
+    sparkVelocities[idx * 3 + 1] = upSpeed;
+    sparkVelocities[idx * 3 + 2] = Math.sin(angle) * speed;
+
+    sparkLifetimes[idx] = 0.6 + Math.random() * 0.4;
+  }
+  sparkCursor = (sparkCursor + count) % MAX_SPARKS;
+}
+
+// --- Transparent Holographic Slot Pads (Grid passes cleanly through!) ---
 function drawRoundedRect(ctx, x, y, w, h, r) {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
@@ -281,61 +395,64 @@ function createSlotPadTexture(label, isCorrect = false, isHovered = false) {
   canvas.height = 384;
   const ctx = canvas.getContext('2d');
 
-  let bgFill = 'rgba(6, 26, 54, 0.75)';
-  let borderColor = '#00e5ff';
+  let borderColor = 'rgba(0, 229, 255, 0.75)';
   let textColor = '#38bdf8';
+  let cornerColor = '#00e5ff';
 
   if (isCorrect) {
-    bgFill = 'rgba(5, 46, 32, 0.90)';
     borderColor = '#10b981';
     textColor = '#34d399';
+    cornerColor = '#34d399';
+    // Subtle translucent emerald glow only on verified
+    ctx.fillStyle = 'rgba(16, 185, 129, 0.12)';
+    drawRoundedRect(ctx, 16, 16, 480, 352, 28);
+    ctx.fill();
   } else if (isHovered) {
-    bgFill = 'rgba(14, 58, 92, 0.92)';
     borderColor = '#38bdf8';
     textColor = '#ffffff';
+    cornerColor = '#ffffff';
+    ctx.fillStyle = 'rgba(56, 189, 248, 0.18)';
+    drawRoundedRect(ctx, 16, 16, 480, 352, 28);
+    ctx.fill();
   }
 
-  // Card background
-  ctx.fillStyle = bgFill;
-  drawRoundedRect(ctx, 12, 12, 488, 360, 32);
-  ctx.fill();
-
-  // Glowing border
+  // Glowing boundary outline (center is transparent so grid lines are 100% visible!)
   ctx.strokeStyle = borderColor;
-  ctx.lineWidth = isHovered || isCorrect ? 8 : 5;
+  ctx.lineWidth = isHovered || isCorrect ? 6 : 4;
+  drawRoundedRect(ctx, 16, 16, 480, 352, 28);
   ctx.stroke();
 
   // Corner crosshairs on slot pad
-  ctx.strokeStyle = borderColor;
-  ctx.lineWidth = 4;
-  const ch = 24;
+  ctx.strokeStyle = cornerColor;
+  ctx.lineWidth = 6;
+  const ch = 32;
   // TL
-  ctx.beginPath(); ctx.moveTo(20, 20 + ch); ctx.lineTo(20, 20); ctx.lineTo(20 + ch, 20); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(24, 24 + ch); ctx.lineTo(24, 24); ctx.lineTo(24 + ch, 24); ctx.stroke();
   // TR
-  ctx.beginPath(); ctx.moveTo(492 - ch, 20); ctx.lineTo(492, 20); ctx.lineTo(492, 20 + ch); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(488 - ch, 24); ctx.lineTo(488, 24); ctx.lineTo(488, 24 + ch); ctx.stroke();
   // BL
-  ctx.beginPath(); ctx.moveTo(20, 364 - ch); ctx.lineTo(20, 364); ctx.lineTo(20 + ch, 364); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(24, 360 - ch); ctx.lineTo(24, 360); ctx.lineTo(24 + ch, 360); ctx.stroke();
   // BR
-  ctx.beginPath(); ctx.moveTo(492 - ch, 364); ctx.lineTo(492, 364); ctx.lineTo(492, 364 - ch); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(488 - ch, 360); ctx.lineTo(488, 360); ctx.lineTo(488, 360 - ch); ctx.stroke();
 
   // Slot header text
   ctx.fillStyle = textColor;
-  ctx.font = 'bold 64px system-ui, -apple-system, sans-serif';
+  ctx.font = 'bold 56px system-ui, -apple-system, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(`SLOT ${label}`, 256, 160);
+  ctx.fillText(`SLOT ${label}`, 256, 145);
 
   // Status subtitle
-  ctx.font = 'bold 38px system-ui, -apple-system, sans-serif';
+  ctx.font = 'bold 36px system-ui, -apple-system, sans-serif';
   if (isCorrect) {
     ctx.fillStyle = '#34d399';
-    ctx.fillText('✓ VERIFIED', 256, 260);
+    ctx.fillText('✓ VERIFIED', 256, 255);
   } else if (isHovered) {
     ctx.fillStyle = '#38bdf8';
-    ctx.fillText('DROP TO SWAP', 256, 260);
+    ctx.fillText('DROP TO SWAP', 256, 255);
   } else {
     ctx.fillStyle = 'rgba(148, 163, 184, 0.85)';
-    ctx.fillText('STEP ' + label, 256, 260);
+    ctx.fillText('STEP ' + label, 256, 255);
   }
 
   const texture = new THREE.CanvasTexture(canvas);
@@ -353,7 +470,7 @@ for (let i = 0; i < SLOT_POSITIONS.length; i++) {
     side: THREE.DoubleSide,
   });
 
-  const padMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.24, 0.17), padMat);
+  const padMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.26, 0.19), padMat);
   padMesh.rotation.x = -Math.PI / 2;
   padMesh.position.set(slotDef.pos[0], lineY + 0.003, slotDef.pos[2]);
   padMesh.userData.slotIndex = i;
@@ -672,6 +789,8 @@ function triggerFormingAnimation() {
   holoGridGroup.scale.set(0.001, 0.001, 0.001);
   frameMat.emissiveIntensity = 2.5;
 
+  spawnSparks(gridOrigin, 50, 0x00ffff);
+
   for (let i = 0; i < allPartMeshes.length; i++) {
     const mesh = allPartMeshes[i];
     mesh.userData.spawnDelay = i * 0.045; // Staggered entry
@@ -901,6 +1020,14 @@ function swapSlots(sourceSlotIdx, targetSlotIdx) {
   itemA.userData.currentSlot = targetSlotIdx;
   itemA.userData.targetPos.copy(getSlotWorldPosition(targetSlotIdx, itemA.userData.halfH));
 
+  // Spawn particle spark burst at destination slot
+  const isTargetCorrect = itemA.userData.part.targetSlot === targetSlotIdx;
+  spawnSparks(
+    getSlotWorldPosition(targetSlotIdx, itemA.userData.halfH),
+    35,
+    isTargetCorrect ? 0x10b981 : 0x00e5ff
+  );
+
   updateMannequinReflection();
 }
 
@@ -990,9 +1117,40 @@ function animate() {
   holoGridGroup.position.y = gridOrigin.y + Math.sin(t * 1.5) * 0.006;
 
   // Glowing pulse on holographic grid lines and outer edges
-  majorGridMat.opacity = 0.75 + Math.sin(t * 3.0) * 0.2;
+  majorGridMat.opacity = 0.85 + Math.sin(t * 3.0) * 0.15;
   borderWireMat.opacity = 0.85 + Math.sin(t * 3.0) * 0.15;
-  frameMat.emissiveIntensity = isForming ? frameMat.emissiveIntensity : (0.6 + Math.sin(t * 3.0) * 0.3);
+  frameMat.emissiveIntensity = isForming ? frameMat.emissiveIntensity : (0.7 + Math.sin(t * 3.0) * 0.3);
+  nodeMat.size = 0.020 + Math.sin(t * 3.5) * 0.006;
+
+  // Ambient Holographic Particle Stream update
+  const posArr = ambientGeo.attributes.position.array;
+  for (let i = 0; i < NUM_AMBIENT_PARTICLES; i++) {
+    posArr[i * 3 + 1] += ambientVelocities[i * 3 + 1] * dt;
+    posArr[i * 3 + 0] += Math.sin(t * 1.8 + i) * 0.0008;
+    posArr[i * 3 + 2] += Math.cos(t * 1.8 + i) * 0.0008;
+    if (posArr[i * 3 + 1] > 1.3) {
+      posArr[i * 3 + 1] = 0.01;
+      posArr[i * 3 + 0] = (Math.random() - 0.5) * GRID_W * 0.95;
+      posArr[i * 3 + 2] = (Math.random() - 0.5) * GRID_D * 0.95;
+    }
+  }
+  ambientGeo.attributes.position.needsUpdate = true;
+
+  // Interactive Spark Particle update
+  const sPosArr = sparkGeo.attributes.position.array;
+  for (let i = 0; i < MAX_SPARKS; i++) {
+    if (sparkLifetimes[i] > 0) {
+      sparkLifetimes[i] -= dt;
+      sPosArr[i * 3 + 0] += sparkVelocities[i * 3 + 0] * dt;
+      sPosArr[i * 3 + 1] += sparkVelocities[i * 3 + 1] * dt;
+      sPosArr[i * 3 + 2] += sparkVelocities[i * 3 + 2] * dt;
+      sparkVelocities[i * 3 + 1] -= 2.2 * dt; // gravity
+      if (sparkLifetimes[i] <= 0) {
+        sPosArr[i * 3 + 1] = -100;
+      }
+    }
+  }
+  sparkGeo.attributes.position.needsUpdate = true;
 
   if (isForming) {
     formTimer += dt;
@@ -1000,7 +1158,7 @@ function animate() {
     const gridP = Math.min(1, formTimer / 0.35);
     const gridEase = Math.sin((gridP * Math.PI) / 2);
     holoGridGroup.scale.set(gridEase, gridEase, gridEase);
-    frameMat.emissiveIntensity = 0.6 + (1 - gridP) * 2.0;
+    frameMat.emissiveIntensity = 0.7 + (1 - gridP) * 2.0;
 
     // Staggered materialization for each suit component
     let allFinished = true;
@@ -1088,7 +1246,6 @@ function animate() {
       const rayDir = new THREE.Vector3(0, 0, -1).applyQuaternion(
         grabController.getWorldQuaternion(new THREE.Quaternion())
       );
-      // Project onto plane at grid level + 0.08
       const planeY = holoGridGroup.position.y + 0.08;
       const dist = (planeY - rayOrigin.y) / rayDir.y;
       if (dist > 0 && dist < 4) {
