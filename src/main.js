@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 import { XRButton } from './xrbutton.js';
-import { LIVES, PARTS, ANCHORS } from './config.js';
+import { SLOT_POSITIONS, PARTS, ANCHORS } from './config.js';
 
+// --- Scene & Renderer Setup ---
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x202028);
+scene.background = new THREE.Color(0x10141f);
 
 const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.05, 100);
 camera.position.set(0, 1.6, 2.2);
@@ -20,42 +21,28 @@ renderer.xr.enabled = true;
 document.body.appendChild(renderer.domElement);
 document.body.appendChild(XRButton.createButton(renderer));
 
-scene.add(new THREE.HemisphereLight(0xffffff, 0x444455, 1.2));
-const dir = new THREE.DirectionalLight(0xffffff, 1.5);
-dir.position.set(2, 4, 2);
-scene.add(dir);
+// Lights
+scene.add(new THREE.HemisphereLight(0xffffff, 0x334466, 1.3));
+const dirLight = new THREE.DirectionalLight(0xddeeff, 1.8);
+dirLight.position.set(2, 4, 2);
+scene.add(dirLight);
 
+const blueAccentLight = new THREE.PointLight(0x00e5ff, 2.5, 6);
+blueAccentLight.position.set(0, 1.2, -0.65);
+scene.add(blueAccentLight);
+
+// Solid floor for VR / desktop preview
 const floor = new THREE.Mesh(
-  new THREE.PlaneGeometry(12, 12),
-  new THREE.MeshStandardMaterial({ color: 0x3a3a42 })
+  new THREE.PlaneGeometry(14, 14),
+  new THREE.MeshStandardMaterial({ color: 0x181c28, roughness: 0.85 })
 );
 floor.rotation.x = -Math.PI / 2;
 scene.add(floor);
 
-const tableTopY = 0.85;
-const table = new THREE.Group();
-table.position.set(0, 0, -0.65);
-scene.add(table);
-
-const top = new THREE.Mesh(
-  new THREE.BoxGeometry(1.3, 0.04, 0.8),
-  new THREE.MeshStandardMaterial({ color: 0x6b4f35, roughness: 0.8 })
-);
-top.position.y = tableTopY;
-table.add(top);
-
-for (const [lx, lz] of [[-0.58, -0.34], [0.58, -0.34], [-0.58, 0.34], [0.58, 0.34]]) {
-  const leg = new THREE.Mesh(
-    new THREE.BoxGeometry(0.04, tableTopY, 0.04),
-    new THREE.MeshStandardMaterial({ color: 0x553f2a, roughness: 0.8 })
-  );
-  leg.position.set(lx, tableTopY / 2, lz);
-  table.add(leg);
-}
-
+// --- Mannequin Setup with Reflection Clones ---
 function buildMannequin() {
   const g = new THREE.Group();
-  const mat = new THREE.MeshStandardMaterial({ color: 0x8899aa });
+  const mat = new THREE.MeshStandardMaterial({ color: 0x8899aa, roughness: 0.6 });
   const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.18, 0.45, 8, 16), mat);
   torso.position.y = 1.2;
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.13, 24, 16), mat);
@@ -75,102 +62,11 @@ function buildMannequin() {
   }
   return g;
 }
+
 const mannequin = buildMannequin();
 mannequin.position.set(0, 0, -1.9);
 mannequin.rotation.y = Math.PI;
 scene.add(mannequin);
-
-const labels = [];
-
-function drawRoundedRect(ctx, x, y, w, h, r) {
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.lineTo(x + w - r, y);
-  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-  ctx.lineTo(x + w, y + h - r);
-  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-  ctx.lineTo(x + r, y + h);
-  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-  ctx.lineTo(x, y + r);
-  ctx.quadraticCurveTo(x, y, x + r, y);
-  ctx.closePath();
-}
-
-function createBadge(text, stepNum, width = 0.22, height = 0.055) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 128;
-  const ctx = canvas.getContext('2d');
-
-  // Frosted glass background
-  const bgGrad = ctx.createLinearGradient(0, 0, 0, 128);
-  bgGrad.addColorStop(0, 'rgba(30, 41, 59, 0.82)');
-  bgGrad.addColorStop(1, 'rgba(15, 23, 42, 0.92)');
-  ctx.fillStyle = bgGrad;
-  drawRoundedRect(ctx, 4, 4, 504, 120, 28);
-  ctx.fill();
-
-  // Glass specular top border
-  const borderGrad = ctx.createLinearGradient(0, 0, 0, 128);
-  borderGrad.addColorStop(0, 'rgba(255, 255, 255, 0.45)');
-  borderGrad.addColorStop(0.5, 'rgba(255, 255, 255, 0.15)');
-  borderGrad.addColorStop(1, 'rgba(255, 255, 255, 0.05)');
-  ctx.strokeStyle = borderGrad;
-  ctx.lineWidth = 3;
-  ctx.stroke();
-
-  // Specular top highlight sheen
-  ctx.beginPath();
-  ctx.moveTo(32, 6);
-  ctx.lineTo(480, 6);
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  // Step number disc badge
-  if (stepNum) {
-    ctx.fillStyle = 'rgba(56, 189, 248, 0.18)';
-    ctx.beginPath();
-    ctx.arc(58, 64, 34, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(56, 189, 248, 0.5)';
-    ctx.lineWidth = 2.5;
-    ctx.stroke();
-
-    ctx.fillStyle = '#38bdf8';
-    ctx.font = 'bold 32px system-ui, -apple-system, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(String(stepNum), 58, 65);
-
-    // Part text
-    ctx.fillStyle = '#f8fafc';
-    ctx.font = 'bold 36px system-ui, -apple-system, sans-serif';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(text, 110, 64);
-  } else {
-    ctx.fillStyle = '#f8fafc';
-    ctx.font = 'bold 38px system-ui, -apple-system, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(text, 256, 64);
-  }
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.minFilter = THREE.LinearFilter;
-  const plane = new THREE.Mesh(
-    new THREE.PlaneGeometry(width, height),
-    new THREE.MeshBasicMaterial({
-      map: texture,
-      transparent: true,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-    })
-  );
-  labels.push(plane);
-  return plane;
-}
 
 function makeShape(part) {
   switch (part.shape) {
@@ -187,65 +83,284 @@ function makeShape(part) {
   }
 }
 
-const partsById = new Map();
+// Mannequin clone suit parts (Reflected when placed in correct slot)
+const mannequinClones = new Map();
 for (const part of PARTS) {
-  const mesh = new THREE.Mesh(
+  const cloneMesh = new THREE.Mesh(
     makeShape(part),
-    new THREE.MeshStandardMaterial({ color: part.color, roughness: 0.5, metalness: 0.1 })
+    new THREE.MeshStandardMaterial({
+      color: part.color,
+      roughness: 0.4,
+      metalness: 0.2,
+      emissive: new THREE.Color(part.color).multiplyScalar(0.25),
+    })
   );
-  mesh.userData.part = part;
-  mesh.position.copy(table.position);
-  mesh.position.x += part.tablePos[0];
-  const halfH = part.shape === 'sphere' ? part.size[0] : (part.size[1] || 0.08) / 2;
-  mesh.position.y += tableTopY + 0.02 + halfH;
-  mesh.position.z += part.tablePos[2];
-  scene.add(mesh);
-  partsById.set(part.id, mesh);
-
-  const label = createBadge(part.label || part.name, part.step, 0.22, 0.055);
-  label.position.set(mesh.position.x, mesh.position.y + halfH + 0.065, mesh.position.z);
-  scene.add(label);
-  mesh.userData.label = label;
+  const anchor = new THREE.Vector3(...ANCHORS[part.anchor]);
+  const offset = new THREE.Vector3(...part.mannequinOffset);
+  cloneMesh.position.copy(anchor).add(offset);
+  cloneMesh.scale.setScalar(0.9);
+  cloneMesh.visible = false;
+  mannequin.add(cloneMesh);
+  mannequinClones.set(part.id, cloneMesh);
 }
 
-function createButtonTexture(text, bgGradient = ['#ef4444', '#b91c1c']) {
+// --- Floating High-Tech Blue Holographic Grid ---
+const gridOrigin = new THREE.Vector3(0, 0.85, -0.65);
+const holoGridGroup = new THREE.Group();
+holoGridGroup.position.copy(gridOrigin);
+scene.add(holoGridGroup);
+
+function createHoloGridTexture() {
   const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 192;
+  canvas.width = 1024;
+  canvas.height = 640;
   const ctx = canvas.getContext('2d');
 
-  // Frosted gradient fill
-  const grad = ctx.createLinearGradient(0, 0, 0, 192);
-  grad.addColorStop(0, bgGradient[0]);
-  grad.addColorStop(1, bgGradient[1]);
-  ctx.fillStyle = grad;
-  drawRoundedRect(ctx, 8, 8, 496, 176, 36);
-  ctx.fill();
+  // Background deep cyber tint
+  ctx.fillStyle = 'rgba(4, 14, 34, 0.78)';
+  ctx.fillRect(0, 0, 1024, 640);
 
-  // Glass border
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
+  // Grid lines
+  ctx.strokeStyle = 'rgba(0, 229, 255, 0.28)';
+  ctx.lineWidth = 2;
+  const step = 48;
+  for (let x = 0; x <= 1024; x += step) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, 640);
+    ctx.stroke();
+  }
+  for (let y = 0; y <= 640; y += step) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(1024, y);
+    ctx.stroke();
+  }
+
+  // Outer glowing border
+  ctx.strokeStyle = 'rgba(0, 242, 254, 0.85)';
   ctx.lineWidth = 6;
-  ctx.stroke();
+  ctx.strokeRect(6, 6, 1012, 628);
 
-  // Specular sheen
-  ctx.beginPath();
-  ctx.moveTo(40, 14);
-  ctx.lineTo(472, 14);
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
-  ctx.lineWidth = 3;
-  ctx.stroke();
-
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 64px system-ui, -apple-system, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(text, 256, 96);
+  // Corner brackets
+  ctx.strokeStyle = '#38bdf8';
+  ctx.lineWidth = 10;
+  const len = 40;
+  // TL
+  ctx.beginPath(); ctx.moveTo(8, 8 + len); ctx.lineTo(8, 8); ctx.lineTo(8 + len, 8); ctx.stroke();
+  // TR
+  ctx.beginPath(); ctx.moveTo(1016 - len, 8); ctx.lineTo(1016, 8); ctx.lineTo(1016, 8 + len); ctx.stroke();
+  // BL
+  ctx.beginPath(); ctx.moveTo(8, 632 - len); ctx.lineTo(8, 632); ctx.lineTo(8 + len, 632); ctx.stroke();
+  // BR
+  ctx.beginPath(); ctx.moveTo(1016 - len, 632); ctx.lineTo(1016, 632); ctx.lineTo(1016, 632 - len); ctx.stroke();
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.minFilter = THREE.LinearFilter;
   return texture;
 }
 
+const holoPlatform = new THREE.Mesh(
+  new THREE.BoxGeometry(1.36, 0.015, 0.84),
+  new THREE.MeshStandardMaterial({
+    map: createHoloGridTexture(),
+    transparent: true,
+    opacity: 0.9,
+    roughness: 0.2,
+    metalness: 0.6,
+  })
+);
+holoPlatform.position.y = 0;
+holoGridGroup.add(holoPlatform);
+
+// Outer glowing rim
+const holoEdges = new THREE.LineSegments(
+  new THREE.EdgesGeometry(new THREE.BoxGeometry(1.36, 0.015, 0.84)),
+  new THREE.LineBasicMaterial({ color: 0x00e5ff, transparent: true, opacity: 0.85 })
+);
+holoGridGroup.add(holoEdges);
+
+// --- Holographic Slot Pads (11 Slots) ---
+function drawRoundedRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+function createSlotPadTexture(label, isCorrect = false, isHovered = false) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 192;
+  const ctx = canvas.getContext('2d');
+
+  let bgFill = 'rgba(6, 24, 48, 0.65)';
+  let borderColor = 'rgba(0, 229, 255, 0.45)';
+  let textColor = '#38bdf8';
+
+  if (isCorrect) {
+    bgFill = 'rgba(5, 46, 32, 0.85)';
+    borderColor = '#10b981';
+    textColor = '#34d399';
+  } else if (isHovered) {
+    bgFill = 'rgba(14, 58, 92, 0.88)';
+    borderColor = '#38bdf8';
+    textColor = '#ffffff';
+  }
+
+  ctx.fillStyle = bgFill;
+  drawRoundedRect(ctx, 6, 6, 244, 180, 20);
+  ctx.fill();
+
+  ctx.strokeStyle = borderColor;
+  ctx.lineWidth = isHovered || isCorrect ? 5 : 3;
+  ctx.stroke();
+
+  // Slot header text
+  ctx.fillStyle = textColor;
+  ctx.font = 'bold 36px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`SLOT ${label}`, 128, 80);
+
+  // Status subtitle
+  ctx.font = 'bold 22px system-ui, sans-serif';
+  if (isCorrect) {
+    ctx.fillStyle = '#10b981';
+    ctx.fillText('✓ VERIFIED', 128, 130);
+  } else if (isHovered) {
+    ctx.fillStyle = '#38bdf8';
+    ctx.fillText('DROP TO SWAP', 128, 130);
+  } else {
+    ctx.fillStyle = 'rgba(148, 163, 184, 0.7)';
+    ctx.fillText('STEP ' + label, 128, 130);
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearFilter;
+  return texture;
+}
+
+const slotPads = [];
+for (let i = 0; i < SLOT_POSITIONS.length; i++) {
+  const slotDef = SLOT_POSITIONS[i];
+  const padMat = new THREE.MeshBasicMaterial({
+    map: createSlotPadTexture(slotDef.label, false, false),
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+
+  const padMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.23, 0.16), padMat);
+  padMesh.rotation.x = -Math.PI / 2;
+  padMesh.position.set(slotDef.pos[0], 0.012, slotDef.pos[2]);
+  padMesh.userData.slotIndex = i;
+  padMesh.userData.slotDef = slotDef;
+  holoGridGroup.add(padMesh);
+  slotPads.push(padMesh);
+}
+
+// --- Floating Glassmorphic Part Badges ---
+const labels = [];
+function createBadge(text, stepNum) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+
+  const bgGrad = ctx.createLinearGradient(0, 0, 0, 128);
+  bgGrad.addColorStop(0, 'rgba(15, 23, 42, 0.85)');
+  bgGrad.addColorStop(1, 'rgba(8, 14, 28, 0.95)');
+  ctx.fillStyle = bgGrad;
+  drawRoundedRect(ctx, 4, 4, 504, 120, 26);
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(0, 229, 255, 0.4)';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  // Top sheen
+  ctx.beginPath();
+  ctx.moveTo(32, 6);
+  ctx.lineTo(480, 6);
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Text
+  ctx.fillStyle = '#f8fafc';
+  ctx.font = 'bold 36px system-ui, -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, 256, 64);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearFilter;
+  const plane = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.22, 0.055),
+    new THREE.MeshBasicMaterial({
+      map: texture,
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    })
+  );
+  labels.push(plane);
+  return plane;
+}
+
+// --- Suit Parts Creation ---
+const partsById = new Map();
+const allPartMeshes = [];
+
+for (const part of PARTS) {
+  const mesh = new THREE.Mesh(
+    makeShape(part),
+    new THREE.MeshStandardMaterial({
+      color: part.color,
+      roughness: 0.4,
+      metalness: 0.2,
+      emissive: new THREE.Color(0x000000),
+    })
+  );
+  mesh.userData.part = part;
+  mesh.userData.isPart = true;
+  mesh.userData.currentSlot = 0;
+  mesh.userData.targetPos = new THREE.Vector3();
+  mesh.userData.isGrabbed = false;
+
+  const halfH = part.shape === 'sphere' ? part.size[0] : (part.size[1] || 0.08) / 2;
+  mesh.userData.halfH = halfH;
+
+  scene.add(mesh);
+  partsById.set(part.id, mesh);
+  allPartMeshes.push(mesh);
+
+  const label = createBadge(part.label || part.name, part.step);
+  scene.add(label);
+  mesh.userData.label = label;
+}
+
+// Slot occupancy tracker: slotOccupants[slotIndex] = mesh
+let slotOccupants = new Array(SLOT_POSITIONS.length).fill(null);
+
+function getSlotWorldPosition(slotIndex, halfH = 0.04) {
+  const slotDef = SLOT_POSITIONS[slotIndex];
+  return new THREE.Vector3(
+    gridOrigin.x + slotDef.pos[0],
+    gridOrigin.y + 0.015 + halfH,
+    gridOrigin.z + slotDef.pos[2]
+  );
+}
+
+// --- HUD Setup ---
 const hudCanvas = document.createElement('canvas');
 hudCanvas.width = 2048;
 hudCanvas.height = 512;
@@ -260,35 +375,70 @@ const hud = new THREE.Mesh(
 hud.position.set(0, 2.2, -2.6);
 scene.add(hud);
 
-// Floating 3D Reset Button right next to the Lives section on the HUD
+function createButtonTexture(text, bgGradient = ['#0284c7', '#0369a1']) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 192;
+  const ctx = canvas.getContext('2d');
+
+  const grad = ctx.createLinearGradient(0, 0, 0, 192);
+  grad.addColorStop(0, bgGradient[0]);
+  grad.addColorStop(1, bgGradient[1]);
+  ctx.fillStyle = grad;
+  drawRoundedRect(ctx, 8, 8, 496, 176, 36);
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(0, 242, 254, 0.75)';
+  ctx.lineWidth = 6;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(40, 14);
+  ctx.lineTo(472, 14);
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 58px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, 256, 96);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearFilter;
+  return texture;
+}
+
 const resetBtn = new THREE.Mesh(
-  new THREE.BoxGeometry(0.28, 0.10, 0.03),
+  new THREE.BoxGeometry(0.32, 0.10, 0.03),
   new THREE.MeshStandardMaterial({
-    map: createButtonTexture('↺ RESET', ['#dc2626', '#991b1b']),
+    map: createButtonTexture('↺ SHUFFLE', ['#0284c7', '#075985']),
     roughness: 0.3,
-    metalness: 0.1,
+    metalness: 0.2,
   })
 );
 resetBtn.position.set(0.56, -0.06, 0.02);
 resetBtn.userData.isReset = true;
 hud.add(resetBtn);
 
-function updateHUD() {
+let gameState = 'playing';
+
+function updateHUD(correctCount = 0) {
   hudCtx.clearRect(0, 0, 2048, 512);
 
   // Main Frosted Glass Panel
   const mainGrad = hudCtx.createLinearGradient(0, 0, 0, 512);
-  mainGrad.addColorStop(0, 'rgba(15, 23, 42, 0.72)');
-  mainGrad.addColorStop(1, 'rgba(8, 12, 24, 0.88)');
+  mainGrad.addColorStop(0, 'rgba(15, 23, 42, 0.78)');
+  mainGrad.addColorStop(1, 'rgba(8, 12, 24, 0.92)');
   hudCtx.fillStyle = mainGrad;
   drawRoundedRect(hudCtx, 20, 20, 2008, 472, 48);
   hudCtx.fill();
 
-  // Glass Border with specular light catch
   const borderGrad = hudCtx.createLinearGradient(0, 0, 0, 512);
-  borderGrad.addColorStop(0, 'rgba(255, 255, 255, 0.35)');
-  borderGrad.addColorStop(0.5, 'rgba(255, 255, 255, 0.12)');
-  borderGrad.addColorStop(1, 'rgba(255, 255, 255, 0.04)');
+  borderGrad.addColorStop(0, 'rgba(0, 229, 255, 0.55)');
+  borderGrad.addColorStop(0.5, 'rgba(0, 229, 255, 0.2)');
+  borderGrad.addColorStop(1, 'rgba(255, 255, 255, 0.05)');
   hudCtx.strokeStyle = borderGrad;
   hudCtx.lineWidth = 4;
   hudCtx.stroke();
@@ -301,8 +451,8 @@ function updateHUD() {
   hudCtx.lineWidth = 2.5;
   hudCtx.stroke();
 
-  if (gameState === 'won') {
-    // Trophy Badge
+  if (correctCount === PARTS.length) {
+    // VICTORY
     hudCtx.fillStyle = 'rgba(16, 185, 129, 0.2)';
     drawRoundedRect(hudCtx, 80, 60, 480, 54, 18);
     hudCtx.fill();
@@ -313,50 +463,24 @@ function updateHUD() {
     hudCtx.fillStyle = '#34d399';
     hudCtx.font = 'bold 28px system-ui, sans-serif';
     hudCtx.textAlign = 'center';
-    hudCtx.fillText('🏆  TRAINING CERTIFIED', 320, 96);
+    hudCtx.fillText('🏆  SOP ORDER VERIFIED', 320, 96);
 
     hudCtx.fillStyle = '#f8fafc';
     hudCtx.font = 'bold 64px system-ui, sans-serif';
     hudCtx.textAlign = 'left';
-    hudCtx.fillText('SUIT DONNING COMPLETE', 80, 210);
+    hudCtx.fillText('MANNEQUIN FULLY EQUIPPED', 80, 210);
 
     hudCtx.fillStyle = '#94a3b8';
     hudCtx.font = '500 32px system-ui, sans-serif';
-    hudCtx.fillText('All 11 components equipped in flawless SOP sequence.', 80, 275);
+    hudCtx.fillText('All 11 components placed in flawless SOP donning order.', 80, 275);
 
     hudCtx.fillStyle = '#38bdf8';
     hudCtx.font = '600 28px system-ui, sans-serif';
-    hudCtx.fillText('Point controller at [↺ RESET] on the right to restart.', 80, 390);
-  } else if (gameState === 'lost') {
-    // Fail Badge
-    hudCtx.fillStyle = 'rgba(239, 68, 68, 0.2)';
-    drawRoundedRect(hudCtx, 80, 60, 480, 54, 18);
-    hudCtx.fill();
-    hudCtx.strokeStyle = 'rgba(239, 68, 68, 0.6)';
-    hudCtx.lineWidth = 2;
-    hudCtx.stroke();
-
-    hudCtx.fillStyle = '#f87171';
-    hudCtx.font = 'bold 28px system-ui, sans-serif';
-    hudCtx.textAlign = 'center';
-    hudCtx.fillText('⚠️  SOP VIOLATION — FAILED', 320, 96);
-
-    hudCtx.fillStyle = '#f8fafc';
-    hudCtx.font = 'bold 64px system-ui, sans-serif';
-    hudCtx.textAlign = 'left';
-    hudCtx.fillText('TRAINING SEQUENCE FAILED', 80, 210);
-
-    hudCtx.fillStyle = '#fca5a5';
-    hudCtx.font = '500 32px system-ui, sans-serif';
-    hudCtx.fillText(`Lives depleted. Correctly reached step ${stepIndex + 1} of ${PARTS.length}.`, 80, 275);
-
-    hudCtx.fillStyle = '#fca5a5';
-    hudCtx.font = '600 28px system-ui, sans-serif';
-    hudCtx.fillText('Point controller at [↺ RESET] on the right to try again.', 80, 390);
+    hudCtx.fillText('Select [↺ SHUFFLE] on the right to start a new trial.', 80, 390);
   } else {
-    // Step Badge
+    // IN PROGRESS
     hudCtx.fillStyle = 'rgba(56, 189, 248, 0.15)';
-    drawRoundedRect(hudCtx, 80, 56, 320, 50, 16);
+    drawRoundedRect(hudCtx, 80, 56, 380, 50, 16);
     hudCtx.fill();
     hudCtx.strokeStyle = 'rgba(56, 189, 248, 0.4)';
     hudCtx.lineWidth = 2;
@@ -365,60 +489,134 @@ function updateHUD() {
     hudCtx.fillStyle = '#38bdf8';
     hudCtx.font = 'bold 26px system-ui, sans-serif';
     hudCtx.textAlign = 'center';
-    hudCtx.fillText(`● STEP ${stepIndex + 1} OF ${PARTS.length}`, 240, 90);
+    hudCtx.fillText(`● SEQUENCING PROGRESS`, 270, 90);
 
-    // Segmented Progress Bar (11 segments)
-    const segStart = 430;
-    const segWidth = 65;
+    // 11 Progress segments
+    const segStart = 490;
+    const segWidth = 60;
     const segGap = 8;
     for (let i = 0; i < PARTS.length; i++) {
       const sx = segStart + i * (segWidth + segGap);
-      if (i < stepIndex) {
-        hudCtx.fillStyle = '#10b981';
-      } else if (i === stepIndex) {
-        hudCtx.fillStyle = '#38bdf8';
-      } else {
-        hudCtx.fillStyle = 'rgba(255, 255, 255, 0.12)';
-      }
+      const isSlotCorrect = slotOccupants[i] && slotOccupants[i].userData.part.targetSlot === i;
+      hudCtx.fillStyle = isSlotCorrect ? '#10b981' : 'rgba(255, 255, 255, 0.12)';
       drawRoundedRect(hudCtx, sx, 72, segWidth, 18, 9);
       hudCtx.fill();
     }
 
-    // Target Component Title
+    // Title Instruction
     hudCtx.fillStyle = '#f8fafc';
-    hudCtx.font = 'bold 62px system-ui, sans-serif';
+    hudCtx.font = 'bold 58px system-ui, sans-serif';
     hudCtx.textAlign = 'left';
-    hudCtx.fillText(PARTS[stepIndex].name, 80, 220);
+    hudCtx.fillText('Sort Components into SOP Order (1 → 11)', 80, 220);
 
-    // Subtitle instruction
     hudCtx.fillStyle = '#94a3b8';
     hudCtx.font = '500 30px system-ui, sans-serif';
-    hudCtx.fillText('Locate and select this piece from the table', 80, 280);
+    hudCtx.fillText('Drag & drop parts between holographic slots. Correct placements equip the mannequin.', 80, 280);
 
-    // Lives Container (Bottom Left)
+    // Score pill (Bottom Left)
     hudCtx.fillStyle = 'rgba(255, 255, 255, 0.06)';
-    drawRoundedRect(hudCtx, 80, 350, 360, 84, 20);
+    drawRoundedRect(hudCtx, 80, 350, 420, 84, 20);
     hudCtx.fill();
-    hudCtx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    hudCtx.strokeStyle = 'rgba(0, 229, 255, 0.3)';
     hudCtx.lineWidth = 2;
     hudCtx.stroke();
 
     hudCtx.fillStyle = '#94a3b8';
     hudCtx.font = 'bold 24px system-ui, sans-serif';
     hudCtx.textAlign = 'left';
-    hudCtx.fillText('LIVES', 110, 400);
+    hudCtx.fillText('CORRECT SLOTS', 110, 400);
 
-    // Hearts
-    let heartsStr = '';
-    for (let i = 0; i < lives; i++) heartsStr += '♥ ';
-    for (let i = 0; i < LIVES - lives; i++) heartsStr += '♡ ';
-    hudCtx.fillStyle = '#f43f5e';
+    hudCtx.fillStyle = '#38bdf8';
     hudCtx.font = 'bold 36px system-ui, sans-serif';
-    hudCtx.fillText(heartsStr.trim(), 210, 400);
+    hudCtx.fillText(`${correctCount} / ${PARTS.length}`, 330, 400);
   }
 
   hudTexture.needsUpdate = true;
 }
+
+// --- Shuffling and Dynamic Reflection ---
+function shuffleAndAssign() {
+  gameState = 'playing';
+  // Create randomized permutation of slot indices [0..10]
+  const indices = Array.from({ length: PARTS.length }, (_, i) => i);
+  // Fisher-Yates
+  for (let i = indices.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [indices[i], indices[j]] = [indices[j], indices[i]];
+  }
+
+  // Ensure it's not completely solved on start
+  let matches = 0;
+  for (let i = 0; i < PARTS.length; i++) {
+    if (indices[i] === PARTS[i].targetSlot) matches++;
+  }
+  if (matches >= 9) {
+    // swap two elements
+    [indices[0], indices[1]] = [indices[1], indices[0]];
+  }
+
+  slotOccupants = new Array(SLOT_POSITIONS.length).fill(null);
+
+  for (let i = 0; i < allPartMeshes.length; i++) {
+    const mesh = allPartMeshes[i];
+    const slotIdx = indices[i];
+    slotOccupants[slotIdx] = mesh;
+    mesh.userData.currentSlot = slotIdx;
+    mesh.userData.targetPos.copy(getSlotWorldPosition(slotIdx, mesh.userData.halfH));
+    mesh.position.copy(mesh.userData.targetPos);
+  }
+
+  updateMannequinReflection();
+}
+
+function updateMannequinReflection() {
+  let correctCount = 0;
+
+  for (let s = 0; s < SLOT_POSITIONS.length; s++) {
+    const mesh = slotOccupants[s];
+    const pad = slotPads[s];
+    const isCorrect = mesh && mesh.userData.part.targetSlot === s;
+
+    if (pad) {
+      pad.material.map = createSlotPadTexture(SLOT_POSITIONS[s].label, isCorrect, false);
+      pad.material.map.needsUpdate = true;
+    }
+
+    if (isCorrect) {
+      correctCount++;
+      mannequinClones.get(mesh.userData.part.id).visible = true;
+      if (mesh.userData.label) {
+        mesh.userData.label.visible = true;
+      }
+    } else {
+      if (mesh) {
+        mannequinClones.get(mesh.userData.part.id).visible = false;
+      }
+    }
+  }
+
+  // Hide any clones for items not correctly placed
+  for (const part of PARTS) {
+    const mesh = partsById.get(part.id);
+    if (!mesh || mesh.userData.currentSlot !== part.targetSlot) {
+      mannequinClones.get(part.id).visible = false;
+    }
+  }
+
+  if (correctCount === PARTS.length) {
+    gameState = 'won';
+  }
+
+  updateHUD(correctCount);
+}
+
+// Initial Shuffle
+shuffleAndAssign();
+
+// --- Drag & Drop / Swapping State ---
+let grabbedItem = null;
+let grabController = null;
+let hoveredSlotIndex = -1;
 
 const raycaster = new THREE.Raycaster();
 const controllers = [];
@@ -428,10 +626,10 @@ function setupController(index) {
   const controller = renderer.xr.getController(index);
   player.add(controller);
 
-  // Modern glowing laser ray
+  // Glowing laser beam
   const line = new THREE.Line(
     new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -5)]),
-    new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.85 })
+    new THREE.LineBasicMaterial({ color: 0x00e5ff, transparent: true, opacity: 0.85 })
   );
   controller.add(line);
   controller.userData.line = line;
@@ -439,9 +637,9 @@ function setupController(index) {
 
   // Pointer reticle ring
   const reticle = new THREE.Mesh(
-    new THREE.RingGeometry(0.012, 0.018, 32),
+    new THREE.RingGeometry(0.012, 0.02, 32),
     new THREE.MeshBasicMaterial({
-      color: 0x38bdf8,
+      color: 0x00e5ff,
       transparent: true,
       opacity: 0.9,
       side: THREE.DoubleSide,
@@ -456,7 +654,8 @@ function setupController(index) {
   grip.add(controllerModelFactory.createControllerModel(grip));
   player.add(grip);
 
-  controller.addEventListener('selectstart', () => onSelect(controller));
+  controller.addEventListener('selectstart', () => onVRSelectStart(controller));
+  controller.addEventListener('selectend', () => onVRSelectEnd(controller));
   controllers.push(controller);
   return controller;
 }
@@ -475,8 +674,8 @@ renderer.xr.addEventListener('sessionstart', () => {
     renderer.setClearColor(0x000000, 0);
     floor.visible = false;
   } else {
-    scene.background = new THREE.Color(0x202028);
-    renderer.setClearColor(0x202028, 1);
+    scene.background = new THREE.Color(0x10141f);
+    renderer.setClearColor(0x10141f, 1);
     floor.visible = true;
   }
 
@@ -485,8 +684,8 @@ renderer.xr.addEventListener('sessionstart', () => {
 });
 
 renderer.xr.addEventListener('sessionend', () => {
-  scene.background = new THREE.Color(0x202028);
-  renderer.setClearColor(0x202028, 1);
+  scene.background = new THREE.Color(0x10141f);
+  renderer.setClearColor(0x10141f, 1);
   floor.visible = true;
   updateOrbitCamera();
 });
@@ -494,9 +693,8 @@ renderer.xr.addEventListener('sessionend', () => {
 function pickFromRay(origin, direction) {
   raycaster.ray.origin.copy(origin);
   raycaster.ray.direction.copy(direction);
-  const targets = [...partsById.values()].filter((m) => m.visible && !m.userData.attached);
-  if (resetBtn) targets.push(resetBtn);
-  if (gameState !== 'playing' && hud) targets.push(hud);
+
+  const targets = [...allPartMeshes, ...slotPads, resetBtn];
   const hits = raycaster.intersectObjects(targets, false);
   return hits.length ? hits[0] : null;
 }
@@ -513,7 +711,7 @@ function pick(controller) {
   if (hitData) {
     if (controller.userData.reticle) {
       controller.userData.reticle.position.z = -hitData.distance;
-      controller.userData.reticle.scale.setScalar(Math.max(0.4, hitData.distance * 0.4));
+      controller.userData.reticle.scale.setScalar(Math.max(0.3, hitData.distance * 0.35));
     }
     if (controller.userData.line) {
       controller.userData.line.scale.z = hitData.distance / 5;
@@ -531,99 +729,86 @@ function pick(controller) {
   }
 }
 
-let stepIndex = 0;
-let lives = LIVES;
-let gameState = 'playing';
-
-function onSelect(controller) {
-  const hit = controller.userData.hovered || pick(controller);
-  if (hit) {
-    handleTargetClick(hit);
+// Find closest slot to a given world position
+function findClosestSlot(worldPos) {
+  let closestIdx = -1;
+  let minDist = Infinity;
+  for (let s = 0; s < SLOT_POSITIONS.length; s++) {
+    const slotWorldPos = getSlotWorldPosition(s, 0);
+    const dist = worldPos.distanceTo(slotWorldPos);
+    if (dist < minDist) {
+      minDist = dist;
+      closestIdx = s;
+    }
   }
+  return { index: closestIdx, distance: minDist };
 }
 
-function handleTargetClick(target) {
-  if (!target) return;
-  if (target === resetBtn || (target === hud && gameState !== 'playing')) {
-    resetGame();
+function swapSlots(sourceSlotIdx, targetSlotIdx) {
+  if (sourceSlotIdx === targetSlotIdx || sourceSlotIdx < 0 || targetSlotIdx < 0) return;
+
+  const itemA = slotOccupants[sourceSlotIdx];
+  const itemB = slotOccupants[targetSlotIdx];
+
+  if (!itemA) return;
+
+  if (itemB) {
+    // Two-item swap
+    slotOccupants[sourceSlotIdx] = itemB;
+    itemB.userData.currentSlot = sourceSlotIdx;
+    itemB.userData.targetPos.copy(getSlotWorldPosition(sourceSlotIdx, itemB.userData.halfH));
+  } else {
+    slotOccupants[sourceSlotIdx] = null;
+  }
+
+  slotOccupants[targetSlotIdx] = itemA;
+  itemA.userData.currentSlot = targetSlotIdx;
+  itemA.userData.targetPos.copy(getSlotWorldPosition(targetSlotIdx, itemA.userData.halfH));
+
+  updateMannequinReflection();
+}
+
+function onVRSelectStart(controller) {
+  const hit = pick(controller);
+  if (!hit) return;
+
+  if (hit === resetBtn) {
+    shuffleAndAssign();
     return;
   }
-  if (gameState !== 'playing') return;
-  if (target.userData && target.userData.part) {
-    selectPart(target);
+
+  // If grabbed a part mesh
+  if (hit.userData && hit.userData.isPart) {
+    grabbedItem = hit;
+    grabController = controller;
+    grabbedItem.userData.isGrabbed = true;
+    grabbedItem.material.emissive.setHex(0x00e5ff);
   }
 }
 
-function resetGame() {
-  stepIndex = 0;
-  lives = LIVES;
-  gameState = 'playing';
-
-  for (const part of PARTS) {
-    const mesh = partsById.get(part.id);
-    if (mesh) {
-      mesh.userData.attached = false;
-      scene.add(mesh);
-      mesh.position.copy(table.position);
-      mesh.position.x += part.tablePos[0];
-      const halfH = part.shape === 'sphere' ? part.size[0] : (part.size[1] || 0.08) / 2;
-      mesh.position.y += tableTopY + 0.02 + halfH;
-      mesh.position.z += part.tablePos[2];
-      mesh.rotation.set(0, 0, 0);
-      mesh.scale.set(1, 1, 1);
-      mesh.material.color.setHex(part.color);
-      mesh.material.emissive.setHex(0x000000);
-
-      if (mesh.userData.label) {
-        mesh.userData.label.visible = true;
-      }
+function onVRSelectEnd(controller) {
+  if (grabbedItem && grabController === controller) {
+    // Drop logic
+    const { index: closestSlot, distance } = findClosestSlot(grabbedItem.position);
+    if (closestSlot !== -1 && distance < 0.35) {
+      swapSlots(grabbedItem.userData.currentSlot, closestSlot);
+    } else {
+      // return to original slot
+      grabbedItem.userData.targetPos.copy(
+        getSlotWorldPosition(grabbedItem.userData.currentSlot, grabbedItem.userData.halfH)
+      );
     }
+
+    grabbedItem.material.emissive.setHex(0x000000);
+    grabbedItem.userData.isGrabbed = false;
+    grabbedItem = null;
+    grabController = null;
+    updateMannequinReflection();
   }
-
-  updateHUD();
 }
 
-function selectPart(target) {
-  if (gameState !== 'playing' || !target) return;
-  const part = target.userData.part;
-
-  if (part.step === stepIndex + 1) {
-    attachPart(target, part);
-    stepIndex++;
-    if (stepIndex >= PARTS.length) {
-      gameState = 'won';
-    }
-  } else {
-    lives--;
-    flashRed(target);
-    if (lives <= 0) gameState = 'lost';
-  }
-  updateHUD();
-}
-
-function attachPart(mesh, part) {
-  mesh.userData.attached = true;
-  if (mesh.userData.label) {
-    mesh.userData.label.visible = false;
-  }
-  const anchor = new THREE.Vector3(...ANCHORS[part.anchor]);
-  const offset = new THREE.Vector3(...part.mannequinOffset);
-  mannequin.add(mesh);
-  mesh.position.copy(anchor).add(offset);
-  mesh.rotation.set(0, 0, 0);
-  mesh.scale.setScalar(0.9);
-}
-
-function flashRed(mesh) {
-  const orig = mesh.material.color.getHex();
-  mesh.material.color.setHex(0xff2222);
-  setTimeout(() => mesh.material.color.setHex(orig), 400);
-}
-
-updateHUD();
-
+// --- Animation Loop ---
 const clock = new THREE.Clock();
-
 const MOVE_SPEED = 2.2;
 const SNAP_ANGLE = Math.PI / 6;
 let snapCooldown = 0;
@@ -643,9 +828,7 @@ function updateLocomotion(dt) {
       forward.y = 0;
       forward.normalize();
       const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).negate();
-      const move = new THREE.Vector3()
-        .addScaledVector(forward, -y)
-        .addScaledVector(right, x);
+      const move = new THREE.Vector3().addScaledVector(forward, -y).addScaledVector(right, x);
       if (move.lengthSq() > 0.01) {
         player.position.addScaledVector(move.normalize(), MOVE_SPEED * dt);
       }
@@ -667,6 +850,27 @@ function animate() {
   const t = clock.elapsedTime;
   updateLocomotion(dt);
 
+  // Subtle floating hover bob on holographic platform
+  holoGridGroup.position.y = gridOrigin.y + Math.sin(t * 1.5) * 0.006;
+
+  // Update part positions (smooth glide to targetPos when not grabbed)
+  for (const mesh of allPartMeshes) {
+    if (!mesh.userData.isGrabbed) {
+      // Sync Y with floating platform
+      mesh.userData.targetPos.y =
+        holoGridGroup.position.y + 0.015 + mesh.userData.halfH;
+      mesh.position.lerp(mesh.userData.targetPos, 0.18);
+    }
+    // Update floating label position
+    if (mesh.userData.label) {
+      mesh.userData.label.position.set(
+        mesh.position.x,
+        mesh.position.y + mesh.userData.halfH + 0.065,
+        mesh.position.z
+      );
+    }
+  }
+
   // Orient all floating labels towards camera
   for (const label of labels) {
     if (label.visible) {
@@ -674,12 +878,27 @@ function animate() {
     }
   }
 
+  // In VR, update grabbed item position along controller ray
   if (renderer.xr.isPresenting) {
+    if (grabbedItem && grabController) {
+      const rayOrigin = grabController.getWorldPosition(new THREE.Vector3());
+      const rayDir = new THREE.Vector3(0, 0, -1).applyQuaternion(
+        grabController.getWorldQuaternion(new THREE.Quaternion())
+      );
+      // Project onto plane at grid level + 0.08
+      const planeY = holoGridGroup.position.y + 0.08;
+      const dist = (planeY - rayOrigin.y) / rayDir.y;
+      if (dist > 0 && dist < 4) {
+        const targetPoint = rayOrigin.clone().addScaledVector(rayDir, dist);
+        grabbedItem.position.lerp(targetPoint, 0.35);
+      }
+    }
+
     for (const controller of controllers) {
       const hit = pick(controller);
       const prev = controller.userData.hovered;
       if (prev && prev !== hit) {
-        if (prev.material && prev.material.emissive) {
+        if (prev.material && prev.material.emissive && !prev.userData.isGrabbed) {
           prev.material.emissive.setHex(0x000000);
         }
         controller.userData.hovered = null;
@@ -687,21 +906,17 @@ function animate() {
       if (hit && hit !== prev) {
         controller.userData.hovered = hit;
       }
-      if (controller.userData.hovered) {
+      if (controller.userData.hovered && !controller.userData.hovered.userData.isGrabbed) {
         const h = controller.userData.hovered;
         if (h.material && h.material.emissive) {
-          if (h.userData && h.userData.isReset) {
-            h.material.emissive.setHex(0x551111);
-          } else {
-            h.material.emissive.setHex(0x333311);
-          }
-          h.material.emissiveIntensity = 1 + Math.sin(t * 6) * 0.5;
+          h.material.emissive.setHex(h.userData.isReset ? 0x0077aa : 0x00e5ff);
+          h.material.emissiveIntensity = 0.8 + Math.sin(t * 8) * 0.4;
         }
       }
     }
-  } else if (mouseHovered) {
+  } else if (mouseHovered && !mouseHovered.userData.isGrabbed) {
     if (mouseHovered.material && mouseHovered.material.emissive) {
-      mouseHovered.material.emissiveIntensity = 1 + Math.sin(t * 6) * 0.5;
+      mouseHovered.material.emissiveIntensity = 0.8 + Math.sin(t * 8) * 0.4;
     }
   }
 
@@ -709,6 +924,7 @@ function animate() {
 }
 renderer.setAnimationLoop(animate);
 
+// --- Desktop Preview Controls (Drag & Drop + Click to Swap) ---
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
@@ -717,13 +933,16 @@ addEventListener('resize', () => {
 
 const mouse = new THREE.Vector2();
 let mouseHovered = null;
-let dragging = false;
+let draggingCam = false;
 let lastX = 0;
 let lastY = 0;
-const orbitTarget = new THREE.Vector3(0, 1.2, -1);
+const orbitTarget = new THREE.Vector3(0, 1.1, -1);
 let orbitAngle = Math.PI;
 let orbitElevation = 0.25;
-let orbitDist = 3.4;
+let orbitDist = 3.2;
+
+let selectedPartForSwap = null; // Click-to-swap support
+let isDraggingPart = false;
 
 function updateOrbitCamera() {
   camera.position.set(
@@ -741,18 +960,64 @@ function updateMouseRay(event) {
   raycaster.setFromCamera(mouse, camera);
 }
 
+const dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -gridOrigin.y - 0.08);
+
 renderer.domElement.addEventListener('pointerdown', (e) => {
   if (renderer.xr.isPresenting) return;
-  dragging = true;
-  lastX = e.clientX;
-  lastY = e.clientY;
+  updateMouseRay(e);
+
+  const hitData = pickFromRay(raycaster.ray.origin, raycaster.ray.direction);
+  const hit = hitData ? hitData.object : null;
+
+  if (hit && hit.userData.isPart) {
+    // Start dragging part
+    grabbedItem = hit;
+    isDraggingPart = true;
+    grabbedItem.userData.isGrabbed = true;
+    grabbedItem.material.emissive.setHex(0x00e5ff);
+  } else if (e.button === 0 && !hit) {
+    draggingCam = true;
+    lastX = e.clientX;
+    lastY = e.clientY;
+  }
 });
 
-addEventListener('pointerup', () => (dragging = false));
+addEventListener('pointerup', (e) => {
+  if (renderer.xr.isPresenting) return;
+
+  if (isDraggingPart && grabbedItem) {
+    const { index: closestSlot, distance } = findClosestSlot(grabbedItem.position);
+    if (closestSlot !== -1 && distance < 0.35) {
+      swapSlots(grabbedItem.userData.currentSlot, closestSlot);
+    } else {
+      grabbedItem.userData.targetPos.copy(
+        getSlotWorldPosition(grabbedItem.userData.currentSlot, grabbedItem.userData.halfH)
+      );
+    }
+    grabbedItem.material.emissive.setHex(0x000000);
+    grabbedItem.userData.isGrabbed = false;
+    grabbedItem = null;
+    isDraggingPart = false;
+    updateMannequinReflection();
+  }
+
+  draggingCam = false;
+});
 
 renderer.domElement.addEventListener('pointermove', (e) => {
   if (renderer.xr.isPresenting) return;
-  if (dragging) {
+  updateMouseRay(e);
+
+  if (isDraggingPart && grabbedItem) {
+    const intersectPoint = new THREE.Vector3();
+    raycaster.ray.intersectPlane(dragPlane, intersectPoint);
+    if (intersectPoint) {
+      grabbedItem.position.copy(intersectPoint);
+    }
+    return;
+  }
+
+  if (draggingCam) {
     orbitAngle -= (e.clientX - lastX) * 0.005;
     orbitElevation = Math.min(1.4, Math.max(-0.2, orbitElevation + (e.clientY - lastY) * 0.005));
     lastX = e.clientX;
@@ -760,11 +1025,12 @@ renderer.domElement.addEventListener('pointermove', (e) => {
     updateOrbitCamera();
     return;
   }
-  updateMouseRay(e);
+
   const hitData = pickFromRay(raycaster.ray.origin, raycaster.ray.direction);
   const hit = hitData ? hitData.object : null;
+
   if (mouseHovered && mouseHovered !== hit) {
-    if (mouseHovered.material && mouseHovered.material.emissive) {
+    if (mouseHovered.material && mouseHovered.material.emissive && !mouseHovered.userData.isGrabbed) {
       mouseHovered.material.emissive.setHex(0x000000);
     }
     mouseHovered = null;
@@ -772,17 +1038,43 @@ renderer.domElement.addEventListener('pointermove', (e) => {
   if (hit && hit !== mouseHovered) {
     mouseHovered = hit;
     if (hit.material && hit.material.emissive) {
-      hit.material.emissive.setHex(hit.userData?.isReset ? 0x551111 : 0x333311);
+      hit.material.emissive.setHex(hit.userData.isReset ? 0x0077aa : 0x00e5ff);
     }
   }
 });
 
+// Click-to-swap support for desktop convenience
 renderer.domElement.addEventListener('click', (e) => {
   if (renderer.xr.isPresenting) return;
   updateMouseRay(e);
+
   const hitData = pickFromRay(raycaster.ray.origin, raycaster.ray.direction);
   const hit = hitData ? hitData.object : null;
-  handleTargetClick(hit);
+
+  if (hit === resetBtn) {
+    shuffleAndAssign();
+    return;
+  }
+
+  if (hit && hit.userData.isPart) {
+    if (!selectedPartForSwap) {
+      selectedPartForSwap = hit;
+      selectedPartForSwap.material.emissive.setHex(0x38bdf8);
+    } else if (selectedPartForSwap === hit) {
+      selectedPartForSwap.material.emissive.setHex(0x000000);
+      selectedPartForSwap = null;
+    } else {
+      // Swap clicked parts
+      swapSlots(selectedPartForSwap.userData.currentSlot, hit.userData.currentSlot);
+      selectedPartForSwap.material.emissive.setHex(0x000000);
+      selectedPartForSwap = null;
+    }
+  } else if (hit && hit.userData.slotIndex !== undefined && selectedPartForSwap) {
+    // Clicked a slot while holding a selected part
+    swapSlots(selectedPartForSwap.userData.currentSlot, hit.userData.slotIndex);
+    selectedPartForSwap.material.emissive.setHex(0x000000);
+    selectedPartForSwap = null;
+  }
 });
 
 renderer.domElement.addEventListener('wheel', (e) => {

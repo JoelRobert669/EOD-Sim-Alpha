@@ -8,19 +8,21 @@
 
 ## 1. What this project is
 
-A **WebXR training game for Meta Quest 3** that teaches the donning sequence of an EOD
-bomb-disposal suit. The user stands in a room with a table of suit parts and a mannequin.
-They must select parts **in the correct SOP order**; correct picks fly onto the mannequin,
-wrong picks flash red and cost a life (3 lives). Win screen on completion, fail screen at 0 lives.
+A **WebXR training simulation for Meta Quest 3** that teaches the donning sequence of an EOD
+bomb-disposal suit. The user stands in front of a **floating high-tech blue holographic grid** (11 numbered slots)
+and a mannequin. The 11 suit components appear **jumbled** across the slots. The user re-orders the components
+via **drag-and-drop / slot swapping**. When an item is placed into its correct slot (1 through 11), it
+**dynamically reflects on the mannequin in real time**. When all 11 slots are correctly matched, the mannequin
+is 100% equipped and victory is achieved. No lives penalty.
 
-Target hardware: Meta Quest 3 (Meta Quest Browser). Desktop browser preview mode exists for testing.
+Target hardware: Meta Quest 3 (Meta Quest Browser). Mixed Reality Passthrough & VR modes. Desktop browser preview mode.
 
 ## 2. Tech stack
 
-- **Three.js** (^0.169) via npm — rendering + WebXR
+- **Three.js** (^0.169) via npm — rendering + WebXR (MR Passthrough `immersive-ar` + `immersive-vr`)
 - **Vite 5** — dev server & bundler, `@vitejs/plugin-basic-ssl` for HTTPS (required for WebXR)
 - No framework, no build-time TS. Plain ES modules.
-- Custom minimal VRButton (`src/vrbutton.js`) instead of three's example one.
+- Custom modern glassmorphic `XRButton` (`src/xrbutton.js`).
 
 ## 3. How to run
 
@@ -30,60 +32,60 @@ npm run dev        # serves HTTPS on port 5173, --host exposes to LAN
 ```
 
 - **PC preview:** open `https://localhost:5173` → accept self-signed cert warning
-- **Quest 3:** same Wi-Fi → open `https://<PC-LAN-IP>:5173` in Quest Browser → accept cert → ENTER VR
+- **Quest 3:** same Wi-Fi → open `https://<PC-LAN-IP>:5173` in Quest Browser → accept cert → ENTER MR / VR
 - Alternative: `adb reverse tcp:5173 tcp:5173` then use `http://localhost:5173` on Quest
-
-Server is often run in background:
-```powershell
-Start-Process -WindowStyle Hidden pwsh -ArgumentList '-Command', 'npm run dev *>> C:\AI\XR\vite.log'
-```
 
 ## 4. File structure
 
 ```
-index.html          entry page, ENTER VR button
+index.html          entry page
 vite.config.js      vite + basicSsl plugin
 src/
-  config.js         ALL game data: part list, order, colors, table positions,
-                    anchor points, LIVES constant. EDIT THIS for gameplay changes.
-  main.js           scene setup, table+mannequin builders (placeholder geometry),
-                    controller ray picking, selection logic, HUD canvas panel,
-                    locomotion, desktop mouse/orbit preview
-  vrbutton.js       WebXR session entry button
+  config.js         PARTS list, 11 SLOT_POSITIONS, targetSlot indices, anchor points
+  main.js           holographic grid platform, 11 slot pads, drag-and-drop swap logic,
+                    dynamic mannequin reflection, high-DPI glassmorphism HUD, VR controllers
+  xrbutton.js       modern glassmorphic MR Passthrough & VR launcher card
+  vrbutton.js       re-exports XRButton & VRButton
 public/models/      (future) GLTF/GLB files go here
 HANDOFF.md          this file
 ```
 
 ## 5. Game rules implemented
 
-- Correct order currently hardcoded in `src/config.js` PARTS array via `step` field:
+- 11 Numbered Hologram Slots on the floating grid (Slots 01 → 11).
+- Target sequence:
   1. Cooling Suit → 2. Trousers → 3. Boots → 4. Grounding Straps → 5. Rear Panel A
   → 6. Front Panel B → 7. PEM → 8. Battery → 9. Speaker → 10. RCU → 11. Helmet
-- **PENDING CLIENT CONFIRMATION** — order may change; it's just the `step` numbers in config.
-- 3 lives (LIVES const in config.js). Wrong pick = red flash + lose life.
-- Win when all parts attached; fail at 0 lives.
+- **Jumbled Start:** Items start randomly shuffled across the 11 slots.
+- **Drag & Drop / Swap:** Grabbing and dropping an item onto another slot swaps the two items.
+- **Real-time Mannequin Reflection:** An item appears equipped on the mannequin *if and only if* it is in its correct slot number.
+- **No Life Loss:** Free experimentation and re-ordering without penalties.
+- **Victory:** Triggered when all 11 slots are verified ($11/11$).
+- **Reset:** `[↺ SHUFFLE]` button re-randomizes the grid for a new trial.
 
 ## 6. Controls
 
 | Input | Action |
 |---|---|
-| Controller trigger | Select highlighted part |
+| Controller trigger (press & hold) | Grab and drag highlighted part |
+| Controller trigger (release) | Drop & swap into target slot / item |
 | Left thumbstick | Smooth locomotion (2.2 m/s, head-relative) |
 | Right thumbstick | Snap turn 30° |
 | Physical walking | Works — scene anchored via local-floor |
-| Mouse move/click (desktop) | Hover/select parts |
-| Mouse drag / wheel (desktop) | Orbit / zoom camera |
+| Mouse drag / click (desktop) | Drag & drop parts to swap, or click-to-select then click-to-swap |
+| Mouse drag background / wheel | Orbit / zoom preview camera |
 
 ## 7. Current state (as of this doc)
 
 DONE:
-- Full game loop: pick → attach / wrong → life loss → win/fail screens
-- Placeholder primitive shapes for all 11 parts (colored boxes/spheres etc.)
-- Procedural placeholder mannequin + table
-- In-VR HUD panel (step name + hearts), win/fail states
-- Desktop mouse preview mode
-- Thumbstick locomotion + snap turn
-- HTTPS dev server working on Quest
+- High-tech floating blue holographic grid with glowing neon edges (no legs).
+- 11 holographic numbered slot pads with live status indicators (`✓ VERIFIED` / standby).
+- Drag-and-drop with automatic slot swapping (WebXR laser + Desktop mouse).
+- Jumbled shuffle initialization and `[↺ SHUFFLE]` button.
+- Dynamic mannequin reflection: parts equip/unequip in real time based on slot accuracy.
+- High-DPI glassmorphic in-XR HUD with live progress tracker & segmented capsule bar.
+- Mixed Reality (Passthrough MR) and VR dual support with glassmorphic launcher.
+- Distance-adaptive VR laser reticles.
 
 NOT DONE / ROADMAP:
 1. **Swap placeholders for real GLTF models** (client preparing in Blender)
