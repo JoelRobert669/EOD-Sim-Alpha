@@ -731,21 +731,27 @@ function generateJumbledIndices() {
       [indices[i], indices[j]] = [indices[j], indices[i]];
     }
 
-    // Count how many pieces are by pure chance in their correct target slot
-    let correctCount = 0;
+    // Strict Derangement Check: Zero parts are in their correct target slot
+    let hasAnyMatch = false;
     for (let i = 0; i < n; i++) {
-      if (indices[i] === PARTS[i].targetSlot) correctCount++;
+      if (indices[i] === PARTS[i].targetSlot) {
+        hasAnyMatch = true;
+        break;
+      }
     }
 
     const key = indices.join(',');
-    // Ensure: (1) at most 2 accidentally correct, and (2) different from previous shuffle
-    if (correctCount <= 2 && key !== lastPermutationKey) {
+    if (!hasAnyMatch && (key !== lastPermutationKey || attempts > 60)) {
       lastPermutationKey = key;
-      break;
+      return indices;
     }
     attempts++;
-  } while (attempts < 60);
+  } while (attempts < 200);
 
+  // Guaranteed derangement fallback (shift by 1..n-1)
+  const shift = 1 + Math.floor(Math.random() * (n - 1));
+  indices = Array.from({ length: n }, (_, i) => (PARTS[i].targetSlot + shift) % n);
+  lastPermutationKey = indices.join(',');
   return indices;
 }
 
