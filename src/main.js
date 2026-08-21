@@ -8,6 +8,10 @@ scene.background = new THREE.Color(0x202028);
 const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.05, 100);
 camera.position.set(0, 1.6, 2.2);
 
+const player = new THREE.Group();
+player.add(camera);
+scene.add(player);
+
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(devicePixelRatio);
@@ -233,8 +237,48 @@ updateHUD();
 
 const clock = new THREE.Clock();
 
+const MOVE_SPEED = 2.2;
+const SNAP_ANGLE = Math.PI / 6;
+let snapCooldown = 0;
+
+function updateLocomotion(dt) {
+  const session = renderer.xr.getSession();
+  if (!session) return;
+  snapCooldown -= dt;
+  for (const source of session.inputSources) {
+    if (!source.gamepad || !source.handedness) continue;
+    const axes = source.gamepad.axes;
+    const x = axes[2] ?? 0;
+    const y = axes[3] ?? 0;
+    if (source.handedness === 'left') {
+      const forward = new THREE.Vector3();
+      camera.getWorldDirection(forward);
+      forward.y = 0;
+      forward.normalize();
+      const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).negate();
+      const move = new THREE.Vector3()
+        .addScaledVector(forward, -y)
+        .addScaledVector(right, x);
+      if (move.lengthSq() > 0.01) {
+        player.position.addScaledVector(move.normalize(), MOVE_SPEED * dt);
+      }
+    } else if (source.handedness === 'right' && snapCooldown <= 0) {
+      if (Math.abs(x) > 0.7) {
+        const angle = x > 0 ? -SNAP_ANGLE : SNAP_ANGLE;
+        const quat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), angle);
+        const head = camera.getWorldPosition(new THREE.Vector3());
+        player.position.sub(head).applyQuaternion(quat).add(head);
+        player.quaternion.premultiply(quat);
+        snapCooldown = 0.25;
+      }
+    }
+  }
+}
+
 function animate() {
-  const t = clock.getElapsedTime();
+  const dt = clock.getDelta();
+  const t = clock.elapsedTime;
+  updateLocomotion(dt);
   for (const [key, controller] of Object.entries(controllers)) {
     if (!controller.visible) continue;
     const hit = pick(controller);
