@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
-import { VRButton } from 'three/addons/webxr/VRButton.js';
+import { XRButton } from './xrbutton.js';
 import { LIVES, PARTS, ANCHORS } from './config.js';
 
 const scene = new THREE.Scene();
@@ -13,12 +13,12 @@ const player = new THREE.Group();
 player.add(camera);
 scene.add(player);
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(devicePixelRatio);
 renderer.xr.enabled = true;
 document.body.appendChild(renderer.domElement);
-document.body.appendChild(VRButton.createButton(renderer));
+document.body.appendChild(XRButton.createButton(renderer));
 
 scene.add(new THREE.HemisphereLight(0xffffff, 0x444455, 1.2));
 const dir = new THREE.DirectionalLight(0xffffff, 1.5);
@@ -137,11 +137,30 @@ setupController(0);
 setupController(1);
 
 renderer.xr.addEventListener('sessionstart', () => {
+  const session = renderer.xr.getSession();
+  const isAR =
+    session?.mode === 'immersive-ar' ||
+    session?.environmentBlendMode === 'additive' ||
+    session?.environmentBlendMode === 'alpha-blend';
+
+  if (isAR) {
+    scene.background = null;
+    renderer.setClearColor(0x000000, 0);
+    floor.visible = false;
+  } else {
+    scene.background = new THREE.Color(0x202028);
+    renderer.setClearColor(0x202028, 1);
+    floor.visible = true;
+  }
+
   camera.position.set(0, 0, 0);
   camera.quaternion.identity();
 });
 
 renderer.xr.addEventListener('sessionend', () => {
+  scene.background = new THREE.Color(0x202028);
+  renderer.setClearColor(0x202028, 1);
+  floor.visible = true;
   updateOrbitCamera();
 });
 
