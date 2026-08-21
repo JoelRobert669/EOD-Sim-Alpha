@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
+import { VRButton } from 'three/addons/webxr/VRButton.js';
 import { LIVES, PARTS, ANCHORS } from './config.js';
 
 const scene = new THREE.Scene();
@@ -17,6 +18,7 @@ renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(devicePixelRatio);
 renderer.xr.enabled = true;
 document.body.appendChild(renderer.domElement);
+document.body.appendChild(VRButton.createButton(renderer));
 
 scene.add(new THREE.HemisphereLight(0xffffff, 0x444455, 1.2));
 const dir = new THREE.DirectionalLight(0xffffff, 1.5);
@@ -108,33 +110,39 @@ for (const part of PARTS) {
 }
 
 const raycaster = new THREE.Raycaster();
-const hovered = { left: null, right: null };
-const controllers = {};
+const controllers = [];
+const controllerModelFactory = new XRControllerModelFactory();
 
 function setupController(index) {
   const controller = renderer.xr.getController(index);
-  scene.add(controller);
+  player.add(controller);
 
   const line = new THREE.Line(
-    new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 0, -5)]),
-    new THREE.LineBasicMaterial({ color: 0xffffff })
+    new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -5)]),
+    new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6 })
   );
   controller.add(line);
   controller.userData.line = line;
+  controller.userData.hovered = null;
 
   const grip = renderer.xr.getControllerGrip(index);
-  grip.add(new XRControllerModelFactory().createControllerModel(grip));
-  scene.add(grip);
+  grip.add(controllerModelFactory.createControllerModel(grip));
+  player.add(grip);
 
   controller.addEventListener('selectstart', () => onSelect(controller));
-  controllers[index === 0 ? 'left' : 'right'] = controller;
+  controllers.push(controller);
   return controller;
 }
 setupController(0);
 setupController(1);
 
 renderer.xr.addEventListener('sessionstart', () => {
-  for (const c of Object.values(controllers)) c.visible = true;
+  camera.position.set(0, 0, 0);
+  camera.quaternion.identity();
+});
+
+renderer.xr.addEventListener('sessionend', () => {
+  updateOrbitCamera();
 });
 
 function pickFromRay(origin, direction) {
@@ -145,11 +153,15 @@ function pickFromRay(origin, direction) {
   return hits.length ? hits[0].object : null;
 }
 
+const _tempOrigin = new THREE.Vector3();
+const _tempDir = new THREE.Vector3();
+const _tempQuat = new THREE.Quaternion();
+
 function pick(controller) {
-  return pickFromRay(
-    controller.getWorldPosition(new THREE.Vector3()),
-    controller.getWorldDirection(new THREE.Vector3())
-  );
+  controller.getWorldPosition(_tempOrigin);
+  controller.getWorldQuaternion(_tempQuat);
+  _tempDir.set(0, 0, -1).applyQuaternion(_tempQuat);
+  return pickFromRay(_tempOrigin, _tempDir);
 }
 
 let stepIndex = 0;
@@ -158,8 +170,10 @@ let gameState = 'playing';
 
 function onSelect(controller) {
   if (gameState !== 'playing') return;
-  const key = renderer.xr.getController(0) === controller ? 'left' : 'right';
-  selectPart(hovered[key]);
+  const hit = controller.userData.hovered || pick(controller);
+  if (hit) {
+    selectPart(hit);
+  }
 }
 
 function selectPart(target) {
@@ -279,19 +293,27 @@ function animate() {
   const dt = clock.getDelta();
   const t = clock.elapsedTime;
   updateLocomotion(dt);
-  for (const [key, controller] of Object.entries(controllers)) {
-    if (!controller.visible) continue;
-    const hit = pick(controller);
-    if (hovered[key] && hovered[key] !== hit) {
-      hovered[key].material.emissive.setHex(0x000000);
-      hovered[key] = null;
+
+  if (renderer.xr.isPresenting) {
+    for (const controller of controllers) {
+      const hit = pick(controller);
+      const prev = controller.userData.hovered;
+      if (prev && prev !== hit) {
+        prev.material.emissive.setHex(0x000000);
+        controller.userData.hovered = null;
+      }
+      if (hit && hit !== prev) {
+        controller.userData.hovered = hit;
+      }
+      if (controller.userData.hovered) {
+        controller.userData.hovered.material.emissive.setHex(0x333311);
+        controller.userData.hovered.material.emissiveIntensity = 1 + Math.sin(t * 6) * 0.5;
+      }
     }
-    if (hit && hit !== hovered[key]) {
-      hovered[key] = hit;
-      hit.material.emissive.setHex(0x333311);
-      hit.material.emissiveIntensity = 1 + Math.sin(t * 6) * 0.5;
-    }
+  } else if (mouseHovered) {
+    mouseHovered.material.emissiveIntensity = 1 + Math.sin(t * 6) * 0.5;
   }
+
   renderer.render(scene, camera);
 }
 renderer.setAnimationLoop(animate);
