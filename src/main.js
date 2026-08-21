@@ -32,21 +32,22 @@ const floor = new THREE.Mesh(
 floor.rotation.x = -Math.PI / 2;
 scene.add(floor);
 
-const tableTopY = 0.9;
+const tableTopY = 0.85;
 const table = new THREE.Group();
-table.position.set(0, 0, -0.6);
+table.position.set(0, 0, -0.65);
 scene.add(table);
 
 const top = new THREE.Mesh(
-  new THREE.BoxGeometry(2.6, 0.05, 1.6),
-  new THREE.MeshStandardMaterial({ color: 0x6b4f35 })
+  new THREE.BoxGeometry(1.3, 0.04, 0.8),
+  new THREE.MeshStandardMaterial({ color: 0x6b4f35, roughness: 0.8 })
 );
 top.position.y = tableTopY;
 table.add(top);
-for (const [lx, lz] of [[-1.2, -0.7], [1.2, -0.7], [-1.2, 0.7], [1.2, 0.7]]) {
+
+for (const [lx, lz] of [[-0.58, -0.34], [0.58, -0.34], [-0.58, 0.34], [0.58, 0.34]]) {
   const leg = new THREE.Mesh(
-    new THREE.BoxGeometry(0.06, tableTopY, 0.06),
-    new THREE.MeshStandardMaterial({ color: 0x553f2a })
+    new THREE.BoxGeometry(0.04, tableTopY, 0.04),
+    new THREE.MeshStandardMaterial({ color: 0x553f2a, roughness: 0.8 })
   );
   leg.position.set(lx, tableTopY / 2, lz);
   table.add(leg);
@@ -79,6 +80,54 @@ mannequin.position.set(0, 0, -1.9);
 mannequin.rotation.y = Math.PI;
 scene.add(mannequin);
 
+const labels = [];
+
+function createBadge(text, width = 0.20, height = 0.05) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = 'rgba(12, 16, 24, 0.88)';
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+  ctx.lineWidth = 4;
+
+  const r = 24;
+  ctx.beginPath();
+  ctx.moveTo(r, 2);
+  ctx.lineTo(512 - r, 2);
+  ctx.quadraticCurveTo(512 - 2, 2, 512 - 2, r);
+  ctx.lineTo(512 - 2, 128 - r);
+  ctx.quadraticCurveTo(512 - 2, 128 - 2, 512 - r, 128 - 2);
+  ctx.lineTo(r, 128 - 2);
+  ctx.quadraticCurveTo(2, 128 - 2, 2, 128 - r);
+  ctx.lineTo(2, r);
+  ctx.quadraticCurveTo(2, 2, r, 2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 38px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, 256, 64);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearFilter;
+  const plane = new THREE.Mesh(
+    new THREE.PlaneGeometry(width, height),
+    new THREE.MeshBasicMaterial({
+      map: texture,
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    })
+  );
+  labels.push(plane);
+  return plane;
+}
+
 function makeShape(part) {
   switch (part.shape) {
     case 'box':
@@ -98,16 +147,39 @@ const partsById = new Map();
 for (const part of PARTS) {
   const mesh = new THREE.Mesh(
     makeShape(part),
-    new THREE.MeshStandardMaterial({ color: part.color })
+    new THREE.MeshStandardMaterial({ color: part.color, roughness: 0.6 })
   );
   mesh.userData.part = part;
   mesh.position.copy(table.position);
   mesh.position.x += part.tablePos[0];
-  mesh.position.y += tableTopY + 0.03 + part.size[1] / 2;
+  const halfH = part.shape === 'sphere' ? part.size[0] : (part.size[1] || 0.08) / 2;
+  mesh.position.y += tableTopY + 0.02 + halfH;
   mesh.position.z += part.tablePos[2];
   scene.add(mesh);
   partsById.set(part.id, mesh);
+
+  const label = createBadge(part.label || part.name, 0.20, 0.05);
+  label.position.set(mesh.position.x, mesh.position.y + halfH + 0.06, mesh.position.z);
+  scene.add(label);
+  mesh.userData.label = label;
 }
+
+// 3D Reset Button on table corner
+const resetGroup = new THREE.Group();
+resetGroup.position.set(table.position.x + 0.52, tableTopY + 0.02, table.position.z + 0.28);
+scene.add(resetGroup);
+
+const resetBtn = new THREE.Mesh(
+  new THREE.BoxGeometry(0.16, 0.03, 0.08),
+  new THREE.MeshStandardMaterial({ color: 0xcc2222, roughness: 0.3, metalness: 0.1 })
+);
+resetBtn.position.y = 0.015;
+resetBtn.userData.isReset = true;
+resetGroup.add(resetBtn);
+
+const resetLabel = createBadge('↺ RESET', 0.15, 0.045);
+resetLabel.position.set(0, 0.07, 0);
+resetGroup.add(resetLabel);
 
 const raycaster = new THREE.Raycaster();
 const controllers = [];
@@ -167,8 +239,10 @@ renderer.xr.addEventListener('sessionend', () => {
 function pickFromRay(origin, direction) {
   raycaster.ray.origin.copy(origin);
   raycaster.ray.direction.copy(direction);
-  const meshes = [...partsById.values()].filter((m) => m.visible && !m.userData.attached);
-  const hits = raycaster.intersectObjects(meshes, false);
+  const targets = [...partsById.values()].filter((m) => m.visible && !m.userData.attached);
+  targets.push(resetBtn);
+  if (gameState !== 'playing') targets.push(hud);
+  const hits = raycaster.intersectObjects(targets, false);
   return hits.length ? hits[0].object : null;
 }
 
@@ -188,11 +262,51 @@ let lives = LIVES;
 let gameState = 'playing';
 
 function onSelect(controller) {
-  if (gameState !== 'playing') return;
   const hit = controller.userData.hovered || pick(controller);
   if (hit) {
-    selectPart(hit);
+    handleTargetClick(hit);
   }
+}
+
+function handleTargetClick(target) {
+  if (!target) return;
+  if (target === resetBtn || (target === hud && gameState !== 'playing')) {
+    resetGame();
+    return;
+  }
+  if (gameState !== 'playing') return;
+  if (target.userData && target.userData.part) {
+    selectPart(target);
+  }
+}
+
+function resetGame() {
+  stepIndex = 0;
+  lives = LIVES;
+  gameState = 'playing';
+
+  for (const part of PARTS) {
+    const mesh = partsById.get(part.id);
+    if (mesh) {
+      mesh.userData.attached = false;
+      scene.add(mesh);
+      mesh.position.copy(table.position);
+      mesh.position.x += part.tablePos[0];
+      const halfH = part.shape === 'sphere' ? part.size[0] : (part.size[1] || 0.08) / 2;
+      mesh.position.y += tableTopY + 0.02 + halfH;
+      mesh.position.z += part.tablePos[2];
+      mesh.rotation.set(0, 0, 0);
+      mesh.scale.set(1, 1, 1);
+      mesh.material.color.setHex(part.color);
+      mesh.material.emissive.setHex(0x000000);
+
+      if (mesh.userData.label) {
+        mesh.userData.label.visible = true;
+      }
+    }
+  }
+
+  updateHUD();
 }
 
 function selectPart(target) {
@@ -215,6 +329,9 @@ function selectPart(target) {
 
 function attachPart(mesh, part) {
   mesh.userData.attached = true;
+  if (mesh.userData.label) {
+    mesh.userData.label.visible = false;
+  }
   const anchor = new THREE.Vector3(...ANCHORS[part.anchor]);
   const offset = new THREE.Vector3(...part.mannequinOffset);
   mannequin.add(mesh);
@@ -243,26 +360,32 @@ scene.add(hud);
 
 function updateHUD() {
   hudCtx.clearRect(0, 0, 1024, 256);
-  hudCtx.fillStyle = 'rgba(0,0,0,0.65)';
+  hudCtx.fillStyle = 'rgba(0,0,0,0.75)';
   hudCtx.fillRect(0, 0, 1024, 256);
   hudCtx.textAlign = 'center';
   if (gameState === 'won') {
     hudCtx.fillStyle = '#44ff66';
-    hudCtx.font = 'bold 72px sans-serif';
-    hudCtx.fillText('SUIT COMPLETE — WELL DONE', 512, 150);
+    hudCtx.font = 'bold 64px sans-serif';
+    hudCtx.fillText('SUIT COMPLETE — WELL DONE', 512, 105);
+    hudCtx.fillStyle = '#ffffff';
+    hudCtx.font = '36px sans-serif';
+    hudCtx.fillText('Click RESET button on table to restart', 512, 175);
   } else if (gameState === 'lost') {
     hudCtx.fillStyle = '#ff4444';
-    hudCtx.font = 'bold 72px sans-serif';
-    hudCtx.fillText('TRAINING FAILED', 512, 110);
+    hudCtx.font = 'bold 64px sans-serif';
+    hudCtx.fillText('TRAINING FAILED', 512, 90);
     hudCtx.fillStyle = '#ffffff';
-    hudCtx.font = '40px sans-serif';
-    hudCtx.fillText(`Reached step ${stepIndex + 1} of ${PARTS.length}`, 512, 180);
+    hudCtx.font = '36px sans-serif';
+    hudCtx.fillText(`Reached step ${stepIndex + 1} of ${PARTS.length}`, 512, 150);
+    hudCtx.fillStyle = '#ffbbbb';
+    hudCtx.font = 'bold 32px sans-serif';
+    hudCtx.fillText('Click RESET button on table to try again', 512, 205);
   } else {
     hudCtx.fillStyle = '#ffffff';
-    hudCtx.font = 'bold 52px sans-serif';
-    hudCtx.fillText(`Step ${stepIndex + 1}/${PARTS.length}: ${PARTS[stepIndex].name}`, 512, 100);
-    hudCtx.font = '44px sans-serif';
-    hudCtx.fillText('Lives: ' + '\u2665'.repeat(lives) + '\u2661'.repeat(LIVES - lives), 512, 190);
+    hudCtx.font = 'bold 50px sans-serif';
+    hudCtx.fillText(`Step ${stepIndex + 1}/${PARTS.length}: ${PARTS[stepIndex].name}`, 512, 95);
+    hudCtx.font = '42px sans-serif';
+    hudCtx.fillText('Lives: ' + '\u2665'.repeat(lives) + '\u2661'.repeat(LIVES - lives), 512, 180);
   }
   hudTexture.needsUpdate = true;
 }
@@ -313,24 +436,42 @@ function animate() {
   const t = clock.elapsedTime;
   updateLocomotion(dt);
 
+  // Orient all floating labels towards camera
+  for (const label of labels) {
+    if (label.visible) {
+      label.quaternion.copy(camera.quaternion);
+    }
+  }
+
   if (renderer.xr.isPresenting) {
     for (const controller of controllers) {
       const hit = pick(controller);
       const prev = controller.userData.hovered;
       if (prev && prev !== hit) {
-        prev.material.emissive.setHex(0x000000);
+        if (prev.material && prev.material.emissive) {
+          prev.material.emissive.setHex(0x000000);
+        }
         controller.userData.hovered = null;
       }
       if (hit && hit !== prev) {
         controller.userData.hovered = hit;
       }
       if (controller.userData.hovered) {
-        controller.userData.hovered.material.emissive.setHex(0x333311);
-        controller.userData.hovered.material.emissiveIntensity = 1 + Math.sin(t * 6) * 0.5;
+        const h = controller.userData.hovered;
+        if (h.material && h.material.emissive) {
+          if (h.userData && h.userData.isReset) {
+            h.material.emissive.setHex(0x551111);
+          } else {
+            h.material.emissive.setHex(0x333311);
+          }
+          h.material.emissiveIntensity = 1 + Math.sin(t * 6) * 0.5;
+        }
       }
     }
   } else if (mouseHovered) {
-    mouseHovered.material.emissiveIntensity = 1 + Math.sin(t * 6) * 0.5;
+    if (mouseHovered.material && mouseHovered.material.emissive) {
+      mouseHovered.material.emissiveIntensity = 1 + Math.sin(t * 6) * 0.5;
+    }
   }
 
   renderer.render(scene, camera);
@@ -391,12 +532,16 @@ renderer.domElement.addEventListener('pointermove', (e) => {
   updateMouseRay(e);
   const hit = pickFromRay(raycaster.ray.origin.clone(), raycaster.ray.direction.clone());
   if (mouseHovered && mouseHovered !== hit) {
-    mouseHovered.material.emissive.setHex(0x000000);
+    if (mouseHovered.material && mouseHovered.material.emissive) {
+      mouseHovered.material.emissive.setHex(0x000000);
+    }
     mouseHovered = null;
   }
   if (hit && hit !== mouseHovered) {
     mouseHovered = hit;
-    hit.material.emissive.setHex(0x333311);
+    if (hit.material && hit.material.emissive) {
+      hit.material.emissive.setHex(hit.userData?.isReset ? 0x551111 : 0x333311);
+    }
   }
 });
 
@@ -404,7 +549,7 @@ renderer.domElement.addEventListener('click', (e) => {
   if (renderer.xr.isPresenting) return;
   updateMouseRay(e);
   const hit = pickFromRay(raycaster.ray.origin.clone(), raycaster.ray.direction.clone());
-  selectPart(hit);
+  handleTargetClick(hit);
 });
 
 renderer.domElement.addEventListener('wheel', (e) => {
