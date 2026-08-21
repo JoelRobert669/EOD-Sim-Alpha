@@ -300,78 +300,44 @@ holoGridGroup.add(createCornerBracket(halfW - 0.01, -halfD + 0.01, -Math.PI / 2)
 holoGridGroup.add(createCornerBracket(halfW - 0.01, halfD - 0.01, Math.PI));
 holoGridGroup.add(createCornerBracket(-halfW + 0.01, halfD - 0.01, Math.PI / 2));
 
-// --- Ambient Holographic Particle Stream (FX) ---
-const NUM_AMBIENT_PARTICLES = 350;
-const ambientPositions = new Float32Array(NUM_AMBIENT_PARTICLES * 3);
-const ambientVelocities = new Float32Array(NUM_AMBIENT_PARTICLES * 3);
+// --- Holographic Forming Materialization Particles (Active only during refresh/reset) ---
+const NUM_FORM_PARTICLES = 120;
+const formPositions = new Float32Array(NUM_FORM_PARTICLES * 3);
+const formVelocities = new Float32Array(NUM_FORM_PARTICLES * 3);
 
-for (let i = 0; i < NUM_AMBIENT_PARTICLES; i++) {
-  ambientPositions[i * 3 + 0] = (Math.random() - 0.5) * GRID_W * 0.95;
-  ambientPositions[i * 3 + 1] = Math.random() * 1.3;
-  ambientPositions[i * 3 + 2] = (Math.random() - 0.5) * GRID_D * 0.95;
-
-  ambientVelocities[i * 3 + 0] = (Math.random() - 0.5) * 0.02;
-  ambientVelocities[i * 3 + 1] = 0.08 + Math.random() * 0.16; // upward speed
-  ambientVelocities[i * 3 + 2] = (Math.random() - 0.5) * 0.02;
+for (let i = 0; i < NUM_FORM_PARTICLES; i++) {
+  formPositions[i * 3 + 1] = -100;
 }
 
-const ambientGeo = new THREE.BufferGeometry();
-ambientGeo.setAttribute('position', new THREE.BufferAttribute(ambientPositions, 3));
-const ambientMat = new THREE.PointsMaterial({
-  color: 0x38bdf8,
-  size: 0.028,
-  map: particleTexture,
-  transparent: true,
-  opacity: 0.75,
-  blending: THREE.AdditiveBlending,
-  depthWrite: false,
-});
-const ambientParticleSystem = new THREE.Points(ambientGeo, ambientMat);
-holoGridGroup.add(ambientParticleSystem);
-
-// --- Dynamic Interactive Spark Explosions (FX) ---
-const MAX_SPARKS = 200;
-const sparkPositions = new Float32Array(MAX_SPARKS * 3);
-const sparkVelocities = new Float32Array(MAX_SPARKS * 3);
-const sparkLifetimes = new Float32Array(MAX_SPARKS); // remaining life in seconds
-let sparkCursor = 0;
-
-for (let i = 0; i < MAX_SPARKS; i++) {
-  sparkPositions[i * 3 + 1] = -100;
-}
-
-const sparkGeo = new THREE.BufferGeometry();
-sparkGeo.setAttribute('position', new THREE.BufferAttribute(sparkPositions, 3));
-const sparkMat = new THREE.PointsMaterial({
+const formGeo = new THREE.BufferGeometry();
+formGeo.setAttribute('position', new THREE.BufferAttribute(formPositions, 3));
+const formMat = new THREE.PointsMaterial({
   color: 0x00ffff,
   size: 0.035,
   map: particleTexture,
   transparent: true,
-  opacity: 0.95,
+  opacity: 0,
   blending: THREE.AdditiveBlending,
   depthWrite: false,
 });
-const sparkSystem = new THREE.Points(sparkGeo, sparkMat);
-scene.add(sparkSystem);
+const formingParticleSystem = new THREE.Points(formGeo, formMat);
+holoGridGroup.add(formingParticleSystem);
 
-function spawnSparks(worldPos, count = 30, colorHex = 0x00ffff) {
-  sparkMat.color.setHex(colorHex);
-  for (let i = 0; i < count; i++) {
-    const idx = (sparkCursor + i) % MAX_SPARKS;
-    sparkPositions[idx * 3 + 0] = worldPos.x;
-    sparkPositions[idx * 3 + 1] = worldPos.y;
-    sparkPositions[idx * 3 + 2] = worldPos.z;
+function initFormingParticles() {
+  formingParticleSystem.visible = true;
+  formMat.opacity = 1.0;
+  for (let i = 0; i < NUM_FORM_PARTICLES; i++) {
+    formPositions[i * 3 + 0] = (Math.random() - 0.5) * GRID_W * 0.9;
+    formPositions[i * 3 + 1] = Math.random() * 0.05;
+    formPositions[i * 3 + 2] = (Math.random() - 0.5) * GRID_D * 0.9;
 
     const angle = Math.random() * Math.PI * 2;
-    const speed = 0.4 + Math.random() * 0.8;
-    const upSpeed = 0.3 + Math.random() * 0.8;
-    sparkVelocities[idx * 3 + 0] = Math.cos(angle) * speed;
-    sparkVelocities[idx * 3 + 1] = upSpeed;
-    sparkVelocities[idx * 3 + 2] = Math.sin(angle) * speed;
-
-    sparkLifetimes[idx] = 0.6 + Math.random() * 0.4;
+    const speed = 0.15 + Math.random() * 0.35;
+    formVelocities[i * 3 + 0] = Math.cos(angle) * speed;
+    formVelocities[i * 3 + 1] = 0.35 + Math.random() * 0.6; // upward burst
+    formVelocities[i * 3 + 2] = Math.sin(angle) * speed;
   }
-  sparkCursor = (sparkCursor + count) % MAX_SPARKS;
+  formGeo.attributes.position.needsUpdate = true;
 }
 
 // --- Transparent Holographic Slot Pads (Grid passes cleanly through!) ---
@@ -789,7 +755,7 @@ function triggerFormingAnimation() {
   holoGridGroup.scale.set(0.001, 0.001, 0.001);
   frameMat.emissiveIntensity = 2.5;
 
-  spawnSparks(gridOrigin, 50, 0x00ffff);
+  initFormingParticles();
 
   for (let i = 0; i < allPartMeshes.length; i++) {
     const mesh = allPartMeshes[i];
@@ -1020,14 +986,6 @@ function swapSlots(sourceSlotIdx, targetSlotIdx) {
   itemA.userData.currentSlot = targetSlotIdx;
   itemA.userData.targetPos.copy(getSlotWorldPosition(targetSlotIdx, itemA.userData.halfH));
 
-  // Spawn particle spark burst at destination slot
-  const isTargetCorrect = itemA.userData.part.targetSlot === targetSlotIdx;
-  spawnSparks(
-    getSlotWorldPosition(targetSlotIdx, itemA.userData.halfH),
-    35,
-    isTargetCorrect ? 0x10b981 : 0x00e5ff
-  );
-
   updateMannequinReflection();
 }
 
@@ -1122,38 +1080,19 @@ function animate() {
   frameMat.emissiveIntensity = isForming ? frameMat.emissiveIntensity : (0.7 + Math.sin(t * 3.0) * 0.3);
   nodeMat.size = 0.020 + Math.sin(t * 3.5) * 0.006;
 
-  // Ambient Holographic Particle Stream update
-  const posArr = ambientGeo.attributes.position.array;
-  for (let i = 0; i < NUM_AMBIENT_PARTICLES; i++) {
-    posArr[i * 3 + 1] += ambientVelocities[i * 3 + 1] * dt;
-    posArr[i * 3 + 0] += Math.sin(t * 1.8 + i) * 0.0008;
-    posArr[i * 3 + 2] += Math.cos(t * 1.8 + i) * 0.0008;
-    if (posArr[i * 3 + 1] > 1.3) {
-      posArr[i * 3 + 1] = 0.01;
-      posArr[i * 3 + 0] = (Math.random() - 0.5) * GRID_W * 0.95;
-      posArr[i * 3 + 2] = (Math.random() - 0.5) * GRID_D * 0.95;
-    }
-  }
-  ambientGeo.attributes.position.needsUpdate = true;
-
-  // Interactive Spark Particle update
-  const sPosArr = sparkGeo.attributes.position.array;
-  for (let i = 0; i < MAX_SPARKS; i++) {
-    if (sparkLifetimes[i] > 0) {
-      sparkLifetimes[i] -= dt;
-      sPosArr[i * 3 + 0] += sparkVelocities[i * 3 + 0] * dt;
-      sPosArr[i * 3 + 1] += sparkVelocities[i * 3 + 1] * dt;
-      sPosArr[i * 3 + 2] += sparkVelocities[i * 3 + 2] * dt;
-      sparkVelocities[i * 3 + 1] -= 2.2 * dt; // gravity
-      if (sparkLifetimes[i] <= 0) {
-        sPosArr[i * 3 + 1] = -100;
-      }
-    }
-  }
-  sparkGeo.attributes.position.needsUpdate = true;
-
   if (isForming) {
     formTimer += dt;
+    const p = Math.min(1, formTimer / FORM_DURATION);
+
+    // Update forming particles (rise and fade completely)
+    formMat.opacity = Math.max(0, 1.0 - p * 1.15);
+    for (let i = 0; i < NUM_FORM_PARTICLES; i++) {
+      formPositions[i * 3 + 0] += formVelocities[i * 3 + 0] * dt;
+      formPositions[i * 3 + 1] += formVelocities[i * 3 + 1] * dt;
+      formPositions[i * 3 + 2] += formVelocities[i * 3 + 2] * dt;
+    }
+    formGeo.attributes.position.needsUpdate = true;
+
     // Grid expansion ease
     const gridP = Math.min(1, formTimer / 0.35);
     const gridEase = Math.sin((gridP * Math.PI) / 2);
@@ -1204,6 +1143,8 @@ function animate() {
 
     if (formTimer >= FORM_DURATION && allFinished) {
       isForming = false;
+      formingParticleSystem.visible = false;
+      formMat.opacity = 0;
       holoGridGroup.scale.set(1, 1, 1);
       for (const mesh of allPartMeshes) {
         mesh.scale.set(1, 1, 1);
@@ -1215,7 +1156,7 @@ function animate() {
       }
     }
   } else {
-    // Normal update part positions (smooth glide to targetPos when not grabbed)
+    // Normal update part positions without any lingering particles
     for (const mesh of allPartMeshes) {
       if (!mesh.userData.isGrabbed) {
         mesh.userData.targetPos.y =
