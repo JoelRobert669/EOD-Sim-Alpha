@@ -110,75 +110,155 @@ const holoGridGroup = new THREE.Group();
 holoGridGroup.position.copy(gridOrigin);
 scene.add(holoGridGroup);
 
-function createHoloGridTexture() {
-  const canvas = document.createElement('canvas');
-  canvas.width = 1024;
-  canvas.height = 640;
-  const ctx = canvas.getContext('2d');
+const GRID_W = 1.40;
+const GRID_D = 0.84;
+const GRID_H = 0.015;
 
-  // Background deep cyber tint
-  ctx.fillStyle = 'rgba(4, 14, 34, 0.78)';
-  ctx.fillRect(0, 0, 1024, 640);
-
-  // Grid lines
-  ctx.strokeStyle = 'rgba(0, 229, 255, 0.28)';
-  ctx.lineWidth = 2;
-  const step = 48;
-  for (let x = 0; x <= 1024; x += step) {
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, 640);
-    ctx.stroke();
-  }
-  for (let y = 0; y <= 640; y += step) {
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(1024, y);
-    ctx.stroke();
-  }
-
-  // Outer glowing border
-  ctx.strokeStyle = 'rgba(0, 242, 254, 0.85)';
-  ctx.lineWidth = 6;
-  ctx.strokeRect(6, 6, 1012, 628);
-
-  // Corner brackets
-  ctx.strokeStyle = '#38bdf8';
-  ctx.lineWidth = 10;
-  const len = 40;
-  // TL
-  ctx.beginPath(); ctx.moveTo(8, 8 + len); ctx.lineTo(8, 8); ctx.lineTo(8 + len, 8); ctx.stroke();
-  // TR
-  ctx.beginPath(); ctx.moveTo(1016 - len, 8); ctx.lineTo(1016, 8); ctx.lineTo(1016, 8 + len); ctx.stroke();
-  // BL
-  ctx.beginPath(); ctx.moveTo(8, 632 - len); ctx.lineTo(8, 632); ctx.lineTo(8 + len, 632); ctx.stroke();
-  // BR
-  ctx.beginPath(); ctx.moveTo(1016 - len, 632); ctx.lineTo(1016, 632); ctx.lineTo(1016, 632 - len); ctx.stroke();
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.minFilter = THREE.LinearFilter;
-  return texture;
-}
-
-const holoPlatform = new THREE.Mesh(
-  new THREE.BoxGeometry(1.36, 0.015, 0.84),
+// 1. Underlying Translucent Cyber Base Slab
+const holoBaseSlab = new THREE.Mesh(
+  new THREE.BoxGeometry(GRID_W, GRID_H, GRID_D),
   new THREE.MeshStandardMaterial({
-    map: createHoloGridTexture(),
+    color: 0x030d22,
     transparent: true,
-    opacity: 0.9,
-    roughness: 0.2,
-    metalness: 0.6,
+    opacity: 0.82,
+    roughness: 0.15,
+    metalness: 0.85,
+    emissive: 0x01132b,
   })
 );
-holoPlatform.position.y = 0;
-holoGridGroup.add(holoPlatform);
+holoBaseSlab.position.y = 0;
+holoGridGroup.add(holoBaseSlab);
 
-// Outer glowing rim
-const holoEdges = new THREE.LineSegments(
-  new THREE.EdgesGeometry(new THREE.BoxGeometry(1.36, 0.015, 0.84)),
-  new THREE.LineBasicMaterial({ color: 0x00e5ff, transparent: true, opacity: 0.85 })
+// 2. Glowing Outer Perimeter Frame Rails
+const frameMat = new THREE.MeshStandardMaterial({
+  color: 0x021c3d,
+  emissive: 0x00e5ff,
+  emissiveIntensity: 0.7,
+  roughness: 0.2,
+  metalness: 0.8,
+});
+
+// Perimeter rail edges
+const railThickness = 0.012;
+const railHeight = 0.018;
+
+// Front & Back rails
+for (const rz of [-GRID_D / 2, GRID_D / 2]) {
+  const rail = new THREE.Mesh(
+    new THREE.BoxGeometry(GRID_W + railThickness, railHeight, railThickness),
+    frameMat
+  );
+  rail.position.set(0, railHeight / 2 - GRID_H / 2, rz);
+  holoGridGroup.add(rail);
+}
+
+// Left & Right rails
+for (const rx of [-GRID_W / 2, GRID_W / 2]) {
+  const rail = new THREE.Mesh(
+    new THREE.BoxGeometry(railThickness, railHeight, GRID_D + railThickness),
+    frameMat
+  );
+  rail.position.set(rx, railHeight / 2 - GRID_H / 2, 0);
+  holoGridGroup.add(rail);
+}
+
+// 3. Razor-Sharp 3D Vector Grid Lines
+const minorPoints = [];
+const majorPoints = [];
+
+const stepX = 0.07;
+const stepZ = 0.07;
+const halfW = GRID_W / 2;
+const halfD = GRID_D / 2;
+const lineY = GRID_H / 2 + 0.002;
+
+// Vertical grid lines (along Z)
+let colIdx = 0;
+for (let x = -halfW; x <= halfW + 0.001; x += stepX) {
+  const isMajor = colIdx % 2 === 0;
+  const targetArray = isMajor ? majorPoints : minorPoints;
+  targetArray.push(new THREE.Vector3(x, lineY, -halfD), new THREE.Vector3(x, lineY, halfD));
+  colIdx++;
+}
+
+// Horizontal grid lines (along X)
+let rowIdx = 0;
+for (let z = -halfD; z <= halfD + 0.001; z += stepZ) {
+  const isMajor = rowIdx % 2 === 0;
+  const targetArray = isMajor ? majorPoints : minorPoints;
+  targetArray.push(new THREE.Vector3(-halfW, lineY, z), new THREE.Vector3(halfW, lineY, z));
+  rowIdx++;
+}
+
+// Minor grid lines
+const minorGridMat = new THREE.LineBasicMaterial({
+  color: 0x0077b6,
+  transparent: true,
+  opacity: 0.45,
+});
+const minorGrid = new THREE.LineSegments(
+  new THREE.BufferGeometry().setFromPoints(minorPoints),
+  minorGridMat
 );
-holoGridGroup.add(holoEdges);
+holoGridGroup.add(minorGrid);
+
+// Major grid lines
+const majorGridMat = new THREE.LineBasicMaterial({
+  color: 0x00e5ff,
+  transparent: true,
+  opacity: 0.85,
+});
+const majorGrid = new THREE.LineSegments(
+  new THREE.BufferGeometry().setFromPoints(majorPoints),
+  majorGridMat
+);
+holoGridGroup.add(majorGrid);
+
+// Outer luminous neon border wire
+const borderPoints = [
+  new THREE.Vector3(-halfW, lineY + 0.001, -halfD),
+  new THREE.Vector3(halfW, lineY + 0.001, -halfD),
+  new THREE.Vector3(halfW, lineY + 0.001, -halfD),
+  new THREE.Vector3(halfW, lineY + 0.001, halfD),
+  new THREE.Vector3(halfW, lineY + 0.001, halfD),
+  new THREE.Vector3(-halfW, lineY + 0.001, halfD),
+  new THREE.Vector3(-halfW, lineY + 0.001, halfD),
+  new THREE.Vector3(-halfW, lineY + 0.001, -halfD),
+];
+const borderWireMat = new THREE.LineBasicMaterial({
+  color: 0x38bdf8,
+  transparent: true,
+  opacity: 1.0,
+});
+const borderWire = new THREE.LineSegments(
+  new THREE.BufferGeometry().setFromPoints(borderPoints),
+  borderWireMat
+);
+holoGridGroup.add(borderWire);
+
+// 4. Cyber Corner Brackets
+function createCornerBracket(x, z, rotY) {
+  const bracketGroup = new THREE.Group();
+  const bMat = new THREE.MeshStandardMaterial({
+    color: 0x00ffff,
+    emissive: 0x00ffff,
+    emissiveIntensity: 0.9,
+  });
+  const armLen = 0.06;
+  const armThick = 0.006;
+  const arm1 = new THREE.Mesh(new THREE.BoxGeometry(armLen, 0.005, armThick), bMat);
+  arm1.position.set(armLen / 2, lineY + 0.003, 0);
+  const arm2 = new THREE.Mesh(new THREE.BoxGeometry(armThick, 0.005, armLen), bMat);
+  arm2.position.set(0, lineY + 0.003, armLen / 2);
+  bracketGroup.add(arm1, arm2);
+  bracketGroup.position.set(x, 0, z);
+  bracketGroup.rotation.y = rotY;
+  return bracketGroup;
+}
+holoGridGroup.add(createCornerBracket(-halfW + 0.01, -halfD + 0.01, 0));
+holoGridGroup.add(createCornerBracket(halfW - 0.01, -halfD + 0.01, -Math.PI / 2));
+holoGridGroup.add(createCornerBracket(halfW - 0.01, halfD - 0.01, Math.PI));
+holoGridGroup.add(createCornerBracket(-halfW + 0.01, halfD - 0.01, Math.PI / 2));
 
 // --- Holographic Slot Pads (11 Slots) ---
 function drawRoundedRect(ctx, x, y, w, h, r) {
@@ -197,50 +277,65 @@ function drawRoundedRect(ctx, x, y, w, h, r) {
 
 function createSlotPadTexture(label, isCorrect = false, isHovered = false) {
   const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 192;
+  canvas.width = 512;
+  canvas.height = 384;
   const ctx = canvas.getContext('2d');
 
-  let bgFill = 'rgba(6, 24, 48, 0.65)';
-  let borderColor = 'rgba(0, 229, 255, 0.45)';
+  let bgFill = 'rgba(6, 26, 54, 0.75)';
+  let borderColor = '#00e5ff';
   let textColor = '#38bdf8';
 
   if (isCorrect) {
-    bgFill = 'rgba(5, 46, 32, 0.85)';
+    bgFill = 'rgba(5, 46, 32, 0.90)';
     borderColor = '#10b981';
     textColor = '#34d399';
   } else if (isHovered) {
-    bgFill = 'rgba(14, 58, 92, 0.88)';
+    bgFill = 'rgba(14, 58, 92, 0.92)';
     borderColor = '#38bdf8';
     textColor = '#ffffff';
   }
 
+  // Card background
   ctx.fillStyle = bgFill;
-  drawRoundedRect(ctx, 6, 6, 244, 180, 20);
+  drawRoundedRect(ctx, 12, 12, 488, 360, 32);
   ctx.fill();
 
+  // Glowing border
   ctx.strokeStyle = borderColor;
-  ctx.lineWidth = isHovered || isCorrect ? 5 : 3;
+  ctx.lineWidth = isHovered || isCorrect ? 8 : 5;
   ctx.stroke();
+
+  // Corner crosshairs on slot pad
+  ctx.strokeStyle = borderColor;
+  ctx.lineWidth = 4;
+  const ch = 24;
+  // TL
+  ctx.beginPath(); ctx.moveTo(20, 20 + ch); ctx.lineTo(20, 20); ctx.lineTo(20 + ch, 20); ctx.stroke();
+  // TR
+  ctx.beginPath(); ctx.moveTo(492 - ch, 20); ctx.lineTo(492, 20); ctx.lineTo(492, 20 + ch); ctx.stroke();
+  // BL
+  ctx.beginPath(); ctx.moveTo(20, 364 - ch); ctx.lineTo(20, 364); ctx.lineTo(20 + ch, 364); ctx.stroke();
+  // BR
+  ctx.beginPath(); ctx.moveTo(492 - ch, 364); ctx.lineTo(492, 364); ctx.lineTo(492, 364 - ch); ctx.stroke();
 
   // Slot header text
   ctx.fillStyle = textColor;
-  ctx.font = 'bold 36px system-ui, sans-serif';
+  ctx.font = 'bold 64px system-ui, -apple-system, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(`SLOT ${label}`, 128, 80);
+  ctx.fillText(`SLOT ${label}`, 256, 160);
 
   // Status subtitle
-  ctx.font = 'bold 22px system-ui, sans-serif';
+  ctx.font = 'bold 38px system-ui, -apple-system, sans-serif';
   if (isCorrect) {
-    ctx.fillStyle = '#10b981';
-    ctx.fillText('✓ VERIFIED', 128, 130);
+    ctx.fillStyle = '#34d399';
+    ctx.fillText('✓ VERIFIED', 256, 260);
   } else if (isHovered) {
     ctx.fillStyle = '#38bdf8';
-    ctx.fillText('DROP TO SWAP', 128, 130);
+    ctx.fillText('DROP TO SWAP', 256, 260);
   } else {
-    ctx.fillStyle = 'rgba(148, 163, 184, 0.7)';
-    ctx.fillText('STEP ' + label, 128, 130);
+    ctx.fillStyle = 'rgba(148, 163, 184, 0.85)';
+    ctx.fillText('STEP ' + label, 256, 260);
   }
 
   const texture = new THREE.CanvasTexture(canvas);
@@ -258,9 +353,9 @@ for (let i = 0; i < SLOT_POSITIONS.length; i++) {
     side: THREE.DoubleSide,
   });
 
-  const padMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.23, 0.16), padMat);
+  const padMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.24, 0.17), padMat);
   padMesh.rotation.x = -Math.PI / 2;
-  padMesh.position.set(slotDef.pos[0], 0.012, slotDef.pos[2]);
+  padMesh.position.set(slotDef.pos[0], lineY + 0.003, slotDef.pos[2]);
   padMesh.userData.slotIndex = i;
   padMesh.userData.slotDef = slotDef;
   holoGridGroup.add(padMesh);
@@ -852,6 +947,11 @@ function animate() {
 
   // Subtle floating hover bob on holographic platform
   holoGridGroup.position.y = gridOrigin.y + Math.sin(t * 1.5) * 0.006;
+
+  // Glowing pulse on holographic grid lines and outer edges
+  majorGridMat.opacity = 0.75 + Math.sin(t * 3.0) * 0.2;
+  borderWireMat.opacity = 0.85 + Math.sin(t * 3.0) * 0.15;
+  frameMat.emissiveIntensity = 0.6 + Math.sin(t * 3.0) * 0.3;
 
   // Update part positions (smooth glide to targetPos when not grabbed)
   for (const mesh of allPartMeshes) {
