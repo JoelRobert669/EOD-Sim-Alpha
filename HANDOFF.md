@@ -54,8 +54,9 @@ HANDOFF.md          this file
 
 - 11 Numbered Hologram Slots on the floating grid (Slots 01 → 11).
 - Target sequence:
-  1. Cooling Suit → 2. Trousers → 3. Boots → 4. Grounding Straps → 5. Rear Panel A
-  → 6. Front Panel B → 7. PEM → 8. Battery → 9. Speaker → 10. RCU → 11. Helmet
+  1. Cooling Suit → 2. Trousers (C) → 3. PEM into Trousers (J) → 4. Helmet & Visor (I)
+  → 5. Rear Jacket Panel (A) → 6. Front Jacket Panel (B) → 7. Grounding Straps (F)
+  → 8. Foot Protection (D) → 9. RCU into Left Arm (K) → 10. Suit Speaker into Right Arm (N) → 11. Battery Pack behind (M)
 - **Jumbled Start:** Items start randomly shuffled across the 11 slots.
 - **Drag & Drop / Swap:** Grabbing and dropping an item onto another slot swaps the two items.
 - **Real-time Mannequin Reflection:** An item appears equipped on the mannequin *if and only if* it is in its correct slot number.
