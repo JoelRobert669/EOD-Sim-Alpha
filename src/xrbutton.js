@@ -151,7 +151,14 @@ export class XRButton {
       }
       try {
         const session = await navigator.xr.requestSession(mode, {
-          optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking', 'layers'],
+          optionalFeatures: [
+            'local-floor',
+            'bounded-floor',
+            'hand-tracking',
+            'mesh-detection',
+            'hit-test',
+            'layers',
+          ],
         });
 
         session.addEventListener('end', () => {

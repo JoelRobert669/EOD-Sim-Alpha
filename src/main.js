@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
+import { XRHandModelFactory } from 'three/addons/webxr/XRHandModelFactory.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { XRButton } from './xrbutton.js';
 import { SLOT_POSITIONS, PARTS, ANCHORS } from './config.js';
@@ -904,7 +905,7 @@ function updateMannequinReflection() {
 // Initial Shuffle & Materialization
 shuffleAndAssign();
 
-// --- Drag & Drop / Swapping State ---
+// --- Controllers & Hand Tracking with Depth Masking Occlusion ---
 let grabbedItem = null;
 let grabController = null;
 let hoveredSlotIndex = -1;
@@ -912,6 +913,12 @@ let hoveredSlotIndex = -1;
 const raycaster = new THREE.Raycaster();
 const controllers = [];
 const controllerModelFactory = new XRControllerModelFactory();
+
+// Invisible Depth Mask Material (for natural hand & controller occlusion in Passthrough MR)
+const occlusionMaterial = new THREE.MeshBasicMaterial({
+  colorWrite: false, // Transparent: lets real room video show through
+  depthWrite: true,  // Writes to GPU depth buffer to occlude virtual holograms
+});
 
 function setupController(index) {
   const controller = renderer.xr.getController(index);
@@ -952,6 +959,60 @@ function setupController(index) {
 }
 setupController(0);
 setupController(1);
+
+// --- WebXR Meta Hand Tracking with Real-Time Depth Occlusion ---
+const handModelFactory = new XRHandModelFactory(null, (handMeshObj) => {
+  handMeshObj.traverse((child) => {
+    if (child.isMesh) {
+      child.material = occlusionMaterial;
+      child.renderOrder = -1; // Write depth buffer first
+    }
+  });
+});
+
+const hands = [];
+const jointNames = [
+  'wrist',
+  'thumb-metacarpal', 'thumb-phalanx-proximal', 'thumb-phalanx-distal', 'thumb-tip',
+  'index-finger-metacarpal', 'index-finger-phalanx-proximal', 'index-finger-phalanx-intermediate', 'index-finger-phalanx-distal', 'index-finger-tip',
+  'middle-finger-metacarpal', 'middle-finger-phalanx-proximal', 'middle-finger-phalanx-intermediate', 'middle-finger-phalanx-distal', 'middle-finger-tip',
+  'ring-finger-metacarpal', 'ring-finger-phalanx-proximal', 'ring-finger-phalanx-intermediate', 'ring-finger-phalanx-distal', 'ring-finger-tip',
+  'pinky-finger-metacarpal', 'pinky-finger-phalanx-proximal', 'pinky-finger-phalanx-intermediate', 'pinky-finger-phalanx-distal', 'pinky-finger-tip',
+];
+
+function setupHand(index) {
+  const hand = renderer.xr.getHand(index);
+  player.add(hand);
+
+  // 1. Skinned Mesh Hand Model with Depth Occlusion
+  const handModel = handModelFactory.createHandModel(hand, 'mesh');
+  handModel.renderOrder = -1;
+  hand.add(handModel);
+
+  // 2. Procedural Joint Depth Occlusion Spheres (Instant zero-latency fallback)
+  const jointOcclusionGroup = new THREE.Group();
+  jointOcclusionGroup.renderOrder = -1;
+  const jointMeshes = {};
+  const sphereGeo = new THREE.SphereGeometry(0.015, 12, 8);
+
+  for (const name of jointNames) {
+    const s = new THREE.Mesh(sphereGeo, occlusionMaterial);
+    s.visible = false;
+    s.renderOrder = -1;
+    jointOcclusionGroup.add(s);
+    jointMeshes[name] = s;
+  }
+  hand.add(jointOcclusionGroup);
+
+  hand.userData.jointMeshes = jointMeshes;
+  hand.userData.isPinching = false;
+  hand.userData.grabbedItem = null;
+
+  hands.push(hand);
+  return hand;
+}
+setupHand(0);
+setupHand(1);
 
 renderer.xr.addEventListener('sessionstart', () => {
   const session = renderer.xr.getSession();
@@ -1098,6 +1159,110 @@ function onVRSelectEnd(controller) {
   }
 }
 
+// --- Hand Tracking Pinch Interactions ---
+function onHandPinchStart(hand, pinchPos) {
+  let closestPart = null;
+  let minDist = 0.20; // 20cm grab distance
+
+  for (const mesh of allPartMeshes) {
+    const dist = mesh.position.distanceTo(pinchPos);
+    if (dist < minDist) {
+      minDist = dist;
+      closestPart = mesh;
+    }
+  }
+
+  // Check reset button
+  if (resetBtn && resetBtn.position.distanceTo(pinchPos) < 0.22) {
+    shuffleAndAssign();
+    return;
+  }
+
+  if (closestPart) {
+    hand.userData.grabbedItem = closestPart;
+    closestPart.userData.isGrabbed = true;
+    if (closestPart.material && closestPart.material.emissive) {
+      closestPart.material.emissive.setHex(0x00e5ff);
+      closestPart.material.emissiveIntensity = 1.0;
+    }
+  }
+}
+
+function onHandPinchEnd(hand) {
+  const item = hand.userData.grabbedItem;
+  if (!item) return;
+
+  const { index: closestSlot, distance } = findClosestSlot(item.position);
+  if (closestSlot !== -1 && distance < 0.35) {
+    swapSlots(item.userData.currentSlot, closestSlot);
+  } else {
+    item.userData.targetPos.copy(
+      getSlotWorldPosition(item.userData.currentSlot, item.userData.halfH)
+    );
+  }
+
+  if (item.material && item.material.emissive) {
+    item.material.emissive.setHex(0x000000);
+    item.material.emissiveIntensity = 0;
+  }
+  item.userData.isGrabbed = false;
+  hand.userData.grabbedItem = null;
+  updateMannequinReflection();
+}
+
+function updateHandTracking() {
+  for (const hand of hands) {
+    if (!hand.joints) continue;
+
+    let isTracked = false;
+    for (const name of jointNames) {
+      const joint = hand.joints[name];
+      const mesh = hand.userData.jointMeshes?.[name];
+      if (joint && joint.visible) {
+        if (mesh) {
+          mesh.visible = true;
+          mesh.position.copy(joint.position);
+          mesh.quaternion.copy(joint.quaternion);
+          mesh.scale.setScalar(joint.jointRadius ? joint.jointRadius / 0.015 : 1);
+        }
+        isTracked = true;
+      } else if (mesh) {
+        mesh.visible = false;
+      }
+    }
+
+    if (!isTracked) {
+      if (hand.userData.grabbedItem) {
+        onHandPinchEnd(hand);
+      }
+      continue;
+    }
+
+    // Direct Pinch Detection (Index finger tip + Thumb tip)
+    const indexTip = hand.joints['index-finger-tip'];
+    const thumbTip = hand.joints['thumb-tip'];
+
+    if (indexTip && thumbTip && indexTip.visible && thumbTip.visible) {
+      const pinchDist = indexTip.position.distanceTo(thumbTip.position);
+      const pinchMid = new THREE.Vector3().addVectors(indexTip.position, thumbTip.position).multiplyScalar(0.5);
+
+      if (!hand.userData.isPinching) {
+        if (pinchDist < 0.026) {
+          hand.userData.isPinching = true;
+          onHandPinchStart(hand, pinchMid);
+        }
+      } else {
+        if (pinchDist > 0.045) {
+          hand.userData.isPinching = false;
+          onHandPinchEnd(hand);
+        } else if (hand.userData.grabbedItem) {
+          hand.userData.grabbedItem.position.lerp(pinchMid, 0.4);
+        }
+      }
+    }
+  }
+}
+
 // --- Animation Loop ---
 const clock = new THREE.Clock();
 const MOVE_SPEED = 2.2;
@@ -1140,6 +1305,7 @@ function animate() {
   const dt = clock.getDelta();
   const t = clock.elapsedTime;
   updateLocomotion(dt);
+  updateHandTracking();
 
   // Subtle floating hover bob on holographic platform
   holoGridGroup.position.y = gridOrigin.y + Math.sin(t * 1.5) * 0.006;
