@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { XRButton } from './xrbutton.js';
 import { SLOT_POSITIONS, PARTS, ANCHORS } from './config.js';
 
@@ -525,6 +526,69 @@ for (const part of PARTS) {
   scene.add(label);
   mesh.userData.label = label;
 }
+
+// --- Optional GLTF / GLB Model Hotswapper ---
+const gltfLoader = new GLTFLoader();
+
+function hotswapPartGeometry(partId, sourceMesh) {
+  const gridMesh = partsById.get(partId);
+  const mannequinMesh = mannequinClones.get(partId);
+
+  if (gridMesh && sourceMesh.geometry) {
+    gridMesh.geometry.dispose();
+    gridMesh.geometry = sourceMesh.geometry.clone();
+    if (sourceMesh.material) {
+      gridMesh.material = Array.isArray(sourceMesh.material)
+        ? sourceMesh.material.map((m) => m.clone())
+        : sourceMesh.material.clone();
+    }
+  }
+
+  if (mannequinMesh && sourceMesh.geometry) {
+    mannequinMesh.geometry.dispose();
+    mannequinMesh.geometry = sourceMesh.geometry.clone();
+    if (sourceMesh.material) {
+      mannequinMesh.material = Array.isArray(sourceMesh.material)
+        ? sourceMesh.material.map((m) => m.clone())
+        : sourceMesh.material.clone();
+    }
+  }
+}
+
+function loadGLBModels() {
+  // 1. Try master stage.glb
+  gltfLoader.load(
+    './models/stage.glb',
+    (gltf) => {
+      console.log('✅ Loaded master stage.glb! Hotswapping 3D suit assets...');
+      gltf.scene.traverse((child) => {
+        if (child.isMesh && child.name.startsWith('PART_')) {
+          const partId = child.name.replace('PART_', '');
+          hotswapPartGeometry(partId, child);
+        }
+      });
+    },
+    undefined,
+    () => {
+      // 2. Fallback: Check for individual part GLB files in /models/
+      for (const part of PARTS) {
+        gltfLoader.load(
+          `./models/${part.id}.glb`,
+          (gltf) => {
+            let foundMesh = null;
+            gltf.scene.traverse((c) => {
+              if (c.isMesh && !foundMesh) foundMesh = c;
+            });
+            if (foundMesh) hotswapPartGeometry(part.id, foundMesh);
+          },
+          undefined,
+          () => {} // Silent fallback to procedural primitives
+        );
+      }
+    }
+  );
+}
+loadGLBModels();
 
 // Slot occupancy tracker: slotOccupants[slotIndex] = mesh
 let slotOccupants = new Array(SLOT_POSITIONS.length).fill(null);
