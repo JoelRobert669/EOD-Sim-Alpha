@@ -399,8 +399,7 @@ function triggerEquipFX(worldPos, cloneMesh = null) {
       halfH = Math.max(0.06, sz.y / 2);
       rad = Math.max(0.09, Math.max(sz.x, sz.z) / 2 + 0.02);
     }
-    // Apple damped spring start: slight scale down
-    activeEquipClone.scale.set(0.92, 0.92, 0.92);
+    // Pure optical specular highlight pulse (transform remains 100% exact)
     setEmissive(activeEquipClone, 0x38bdf8, 0.65);
   }
 
@@ -1528,13 +1527,9 @@ function animate() {
     equipFxTimer += dt;
     const p = Math.min(1, equipFxTimer / EQUIP_FX_DURATION);
 
-    // 1. Apple Damped Spring Curve for suit piece scale pop (0.92 -> 1.025 -> 1.00)
+    // 1. Soft optical specular pulse fade
     if (activeEquipClone) {
-      const springVal = 1.0 + Math.sin(p * Math.PI * 2.2) * Math.exp(-p * 4.5) * 0.08 - (1 - p) * 0.08;
-      const s = Math.min(1.03, Math.max(0.92, springVal));
-      activeEquipClone.scale.set(s, s, s);
-      // Soft optical specular pulse fade
-      setEmissive(activeEquipClone, 0x38bdf8, Math.max(0, 0.65 * (1.0 - p * 1.2)));
+      setEmissive(activeEquipClone, 0x38bdf8, Math.max(0, 0.75 * (1.0 - p * 1.25)));
     }
 
     // 2. Razor-Thin Optical Light Ring Sweep (Top -> Bottom)
@@ -1556,7 +1551,6 @@ function animate() {
       sweepRingMat.opacity = 0;
       sparkleMat.opacity = 0;
       if (activeEquipClone) {
-        activeEquipClone.scale.set(1, 1, 1);
         setEmissive(activeEquipClone, 0x000000, 0);
         activeEquipClone = null;
       }
