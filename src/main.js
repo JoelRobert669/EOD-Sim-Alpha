@@ -527,14 +527,14 @@ for (const part of PARTS) {
   mesh.userData.label = label;
 }
 
-// --- Optional GLTF / GLB Model Hotswapper ---
+// --- GLTF / GLB Model Hotswapper ---
 const gltfLoader = new GLTFLoader();
 
-function hotswapPartGeometry(partId, sourceMesh) {
+function hotswapPartGeometry(partId, sourceMesh, isEquipped = false) {
   const gridMesh = partsById.get(partId);
   const mannequinMesh = mannequinClones.get(partId);
 
-  if (gridMesh && sourceMesh.geometry) {
+  if (!isEquipped && gridMesh && sourceMesh.geometry) {
     gridMesh.geometry.dispose();
     gridMesh.geometry = sourceMesh.geometry.clone();
     if (sourceMesh.material) {
@@ -547,6 +547,11 @@ function hotswapPartGeometry(partId, sourceMesh) {
   if (mannequinMesh && sourceMesh.geometry) {
     mannequinMesh.geometry.dispose();
     mannequinMesh.geometry = sourceMesh.geometry.clone();
+    if (isEquipped) {
+      mannequinMesh.position.copy(sourceMesh.position);
+      mannequinMesh.quaternion.copy(sourceMesh.quaternion);
+      mannequinMesh.scale.copy(sourceMesh.scale);
+    }
     if (sourceMesh.material) {
       mannequinMesh.material = Array.isArray(sourceMesh.material)
         ? sourceMesh.material.map((m) => m.clone())
@@ -562,9 +567,16 @@ function loadGLBModels() {
     (gltf) => {
       console.log('✅ Loaded master stage.glb! Hotswapping 3D suit assets...');
       gltf.scene.traverse((child) => {
-        if (child.isMesh && child.name.startsWith('PART_')) {
+        if (!child.isMesh) return;
+
+        if (child.name.startsWith('PART_')) {
           const partId = child.name.replace('PART_', '');
-          hotswapPartGeometry(partId, child);
+          hotswapPartGeometry(partId, child, false);
+        } else if (child.name.startsWith('EQUIPPED_') || child.name.startsWith('FIT_')) {
+          const partId = child.name.replace('EQUIPPED_', '').replace('FIT_', '');
+          hotswapPartGeometry(partId, child, true);
+        } else if (child.name.startsWith('MANNEQUIN')) {
+          mannequin.add(child.clone());
         }
       });
     },
@@ -579,7 +591,7 @@ function loadGLBModels() {
             gltf.scene.traverse((c) => {
               if (c.isMesh && !foundMesh) foundMesh = c;
             });
-            if (foundMesh) hotswapPartGeometry(part.id, foundMesh);
+            if (foundMesh) hotswapPartGeometry(part.id, foundMesh, false);
           },
           undefined,
           () => {} // Silent fallback to procedural primitives
