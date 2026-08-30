@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { XRButton } from './xrbutton.js';
 import { SLOT_POSITIONS, PARTS, ANCHORS } from './config.js';
 
@@ -545,7 +546,10 @@ function setEmissive(mesh, colorHex, intensity = 1.0) {
 }
 
 // --- GLTF / GLB Model Hotswapper ---
+const dracoLoader = new DRACOLoader();
+dracoLoader.setDecoderPath('./draco/');
 const gltfLoader = new GLTFLoader();
+gltfLoader.setDRACOLoader(dracoLoader);
 
 function loadGLBModels() {
   // 1. Try master stage.glb
