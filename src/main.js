@@ -906,63 +906,76 @@ let gameState = 'playing';
 function updateHUD(correctCount = 0) {
   // 1. RENDER OBJECTIVE PANEL (High-Density Ultra-Crisp Canvas)
   objCtx.clearRect(0, 0, 2048, 1600);
-  drawVisionOSGlass(objCtx, 24, 24, 2000, 1552, 64, { bgAlpha: 0.70, borderAlpha: 0.40, shadow: true });
+  drawVisionOSGlass(objCtx, 24, 24, 2000, 1552, 64, { bgAlpha: 0.72, borderAlpha: 0.45, shadow: true });
 
-  // Header status pill
+  // Header status pill badge
+  const headerBadgeW = 340;
+  const headerBadgeH = 64;
+  objCtx.fillStyle = 'rgba(56, 189, 248, 0.16)';
+  drawRoundedRect(objCtx, 100, 96, headerBadgeW, headerBadgeH, 32);
+  objCtx.fill();
+  objCtx.strokeStyle = 'rgba(56, 189, 248, 0.5)';
+  objCtx.lineWidth = 2.5;
+  drawRoundedRect(objCtx, 100, 96, headerBadgeW, headerBadgeH, 32);
+  objCtx.stroke();
+
+  // Glowing status dot
   objCtx.beginPath();
-  objCtx.arc(110, 120, 12, 0, Math.PI * 2);
+  objCtx.arc(136, 128, 10, 0, Math.PI * 2);
   objCtx.fillStyle = '#00f0ff';
   objCtx.shadowColor = '#00f0ff';
-  objCtx.shadowBlur = 16;
+  objCtx.shadowBlur = 14;
   objCtx.fill();
   objCtx.shadowBlur = 0;
 
-  objCtx.fillStyle = '#38bdf8';
-  objCtx.font = '800 38px "Plus Jakarta Sans", "Inter", sans-serif';
+  objCtx.fillStyle = '#ffffff';
+  objCtx.font = '800 36px "Plus Jakarta Sans", "Inter", sans-serif';
   objCtx.textAlign = 'left';
-  objCtx.fillText('OBJECTIVE', 140, 132);
+  objCtx.textBaseline = 'middle';
+  objCtx.fillText('OBJECTIVE', 164, 128);
 
   // Large Bold Title
+  objCtx.textBaseline = 'alphabetic';
   objCtx.fillStyle = '#ffffff';
-  objCtx.font = '800 88px "Plus Jakarta Sans", "Inter", -apple-system, sans-serif';
-  objCtx.fillText('Sort Components into', 110, 265);
-  objCtx.fillText('SOP Order (1 → 11)', 110, 375);
+  objCtx.font = '800 92px "Plus Jakarta Sans", "Inter", -apple-system, sans-serif';
+  objCtx.fillText('Sort Components into', 100, 285);
+  objCtx.fillText('SOP Order (1 → 11)', 100, 395);
 
   // Secondary Instructional text
   objCtx.fillStyle = '#cbd5e1';
-  objCtx.font = '600 44px "Inter", "Plus Jakarta Sans", sans-serif';
-  objCtx.fillText('Drag & drop parts between holographic slots.', 110, 500);
-  objCtx.fillText('Correct placement snaps the component.', 110, 565);
+  objCtx.font = '600 46px "Inter", "Plus Jakarta Sans", sans-serif';
+  objCtx.fillText('Drag & drop parts between holographic slots.', 100, 515);
+  objCtx.fillText('Correct placement snaps the component.', 100, 580);
 
   // Hairline divider
   objCtx.beginPath();
-  objCtx.moveTo(110, 650);
-  objCtx.lineTo(1938, 650);
-  objCtx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+  objCtx.moveTo(100, 660);
+  objCtx.lineTo(1948, 660);
+  objCtx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
   objCtx.lineWidth = 3;
   objCtx.stroke();
 
   // Bottom Counter Metric
   objCtx.beginPath();
-  objCtx.arc(155, 800, 34, 0, Math.PI * 2);
+  objCtx.arc(155, 810, 36, 0, Math.PI * 2);
+  objCtx.strokeStyle = '#38bdf8';
+  objCtx.lineWidth = 5;
+  objCtx.stroke();
+  objCtx.beginPath();
+  objCtx.moveTo(155, 788);
+  objCtx.lineTo(155, 810);
+  objCtx.lineTo(172, 810);
   objCtx.strokeStyle = '#38bdf8';
   objCtx.lineWidth = 4.5;
   objCtx.stroke();
-  objCtx.beginPath();
-  objCtx.moveTo(155, 780);
-  objCtx.lineTo(155, 800);
-  objCtx.lineTo(170, 800);
-  objCtx.strokeStyle = '#38bdf8';
-  objCtx.lineWidth = 4;
-  objCtx.stroke();
 
   objCtx.fillStyle = '#ffffff';
-  objCtx.font = '900 96px "Space Grotesk", "Plus Jakarta Sans", sans-serif';
-  objCtx.fillText(`${correctCount} / 11`, 215, 825);
+  objCtx.font = '900 100px "Space Grotesk", "Plus Jakarta Sans", sans-serif';
+  objCtx.fillText(`${correctCount} / 11`, 220, 840);
 
   objCtx.fillStyle = '#94a3b8';
-  objCtx.font = '700 48px "Plus Jakarta Sans", sans-serif';
-  objCtx.fillText('Components placed', 560, 825);
+  objCtx.font = '700 50px "Plus Jakarta Sans", sans-serif';
+  objCtx.fillText('Components placed', 585, 840);
 
   // Abstract Blue Wave Graphic at bottom
   const waveY = 1320;
@@ -981,50 +994,79 @@ function updateHUD(correctCount = 0) {
 
   // 2. RENDER PROGRESS PANEL (High-Density Canvas)
   progCtx.clearRect(0, 0, 1600, 960);
-  drawVisionOSGlass(progCtx, 24, 24, 1552, 912, 56, { bgAlpha: 0.72, borderAlpha: 0.40, shadow: true });
+  drawVisionOSGlass(progCtx, 24, 24, 1552, 912, 56, { bgAlpha: 0.72, borderAlpha: 0.45, shadow: true });
 
-  // Progress Header
+  // Progress Header Pill Badge
+  const progBadgeW = 560;
+  const progBadgeH = 72;
+  progCtx.fillStyle = 'rgba(56, 189, 248, 0.18)';
+  drawRoundedRect(progCtx, 80, 75, progBadgeW, progBadgeH, 36);
+  progCtx.fill();
+  progCtx.strokeStyle = 'rgba(56, 189, 248, 0.55)';
+  progCtx.lineWidth = 3;
+  drawRoundedRect(progCtx, 80, 75, progBadgeW, progBadgeH, 36);
+  progCtx.stroke();
+
+  // Header Status Dot
   progCtx.beginPath();
-  progCtx.arc(90, 100, 10, 0, Math.PI * 2);
+  progCtx.arc(120, 111, 12, 0, Math.PI * 2);
   progCtx.fillStyle = '#00f0ff';
   progCtx.shadowColor = '#00f0ff';
-  progCtx.shadowBlur = 14;
+  progCtx.shadowBlur = 16;
   progCtx.fill();
   progCtx.shadowBlur = 0;
 
-  progCtx.fillStyle = '#38bdf8';
-  progCtx.font = '800 36px "Plus Jakarta Sans", "Inter", sans-serif';
+  // Header Title
+  progCtx.fillStyle = '#ffffff';
+  progCtx.font = '800 42px "Plus Jakarta Sans", "Inter", -apple-system, sans-serif';
   progCtx.textAlign = 'left';
-  progCtx.fillText('SEQUENCING PROGRESS', 118, 112);
+  progCtx.textBaseline = 'middle';
+  progCtx.fillText('SEQUENCING PROGRESS', 150, 111);
 
-  // 11 Segmented Progress Pills (Large & High Contrast)
-  const segW = 112;
-  const segH = 24;
+  // Status Subtitle in Middle of Panel
+  progCtx.textBaseline = 'alphabetic';
+  progCtx.fillStyle = correctCount === PARTS.length ? '#34d399' : '#38bdf8';
+  progCtx.font = '800 58px "Space Grotesk", "Plus Jakarta Sans", sans-serif';
+  if (correctCount === PARTS.length) {
+    progCtx.fillText('🏆  ALL 11 COMPONENTS EQUIPPED', 80, 245);
+  } else {
+    progCtx.fillText(`${correctCount} OF 11 PARTS CORRECTLY PLACED`, 80, 245);
+  }
+
+  // 11 Segmented Progress Pills (Large, High Contrast & Glowing)
+  const segW = 114;
+  const segH = 32;
   const segGap = 18;
-  const startX = 90;
+  const startX = 80;
   for (let i = 0; i < PARTS.length; i++) {
     const px = startX + i * (segW + segGap);
     const isSlotCorrect = slotOccupants[i] && slotOccupants[i].userData.part.targetSlot === i;
-    progCtx.fillStyle = isSlotCorrect ? '#00f0ff' : 'rgba(71, 85, 105, 0.65)';
+    progCtx.fillStyle = isSlotCorrect ? '#00f0ff' : 'rgba(71, 85, 105, 0.7)';
     if (isSlotCorrect) {
       progCtx.shadowColor = '#00f0ff';
-      progCtx.shadowBlur = 12;
+      progCtx.shadowBlur = 16;
     }
-    drawRoundedRect(progCtx, px, 210, segW, segH, 12);
+    drawRoundedRect(progCtx, px, 310, segW, segH, 16);
     progCtx.fill();
     progCtx.shadowBlur = 0;
+
+    // Segment border
+    progCtx.strokeStyle = isSlotCorrect ? 'rgba(255, 255, 255, 0.7)' : 'rgba(255, 255, 255, 0.15)';
+    progCtx.lineWidth = 2;
+    drawRoundedRect(progCtx, px, 310, segW, segH, 16);
+    progCtx.stroke();
   }
 
   // Large Pill-Shaped SHUFFLE Button
-  const btnX = 420;
+  const btnX = 380;
   const btnY = 560;
-  const btnW = 760;
-  const btnH = 180;
-  drawVisionOSGlass(progCtx, btnX, btnY, btnW, btnH, 90, { bgAlpha: 0.85, borderAlpha: 0.50, shadow: true });
+  const btnW = 840;
+  const btnH = 200;
+  drawVisionOSGlass(progCtx, btnX, btnY, btnW, btnH, 100, { bgAlpha: 0.88, borderAlpha: 0.55, shadow: true });
 
   // Shuffle Icon & Text
   progCtx.fillStyle = '#ffffff';
-  progCtx.font = '800 68px "Plus Jakarta Sans", "Inter", -apple-system, sans-serif';
+  progCtx.font = '900 76px "Plus Jakarta Sans", "Inter", -apple-system, sans-serif';
   progCtx.textAlign = 'center';
   progCtx.textBaseline = 'middle';
   progCtx.fillText('↝  SHUFFLE', btnX + btnW / 2, btnY + btnH / 2);
