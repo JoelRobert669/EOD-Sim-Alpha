@@ -50,7 +50,7 @@ function buildMannequin() {
   head.position.y = 1.62;
   const hips = new THREE.Mesh(new THREE.CapsuleGeometry(0.16, 0.12, 8, 16), mat);
   hips.position.y = 0.95;
-  g.add(torso, head, hips);
+  proceduralMannequinGroup.add(torso, head, hips);
   for (const sx of [-1, 1]) {
     const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.055, 0.55, 6, 12), mat);
     arm.position.set(sx * 0.26, 1.22, 0);
@@ -59,11 +59,13 @@ function buildMannequin() {
     leg.position.set(sx * 0.11, 0.48, 0);
     const foot = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.08, 0.26), mat);
     foot.position.set(sx * 0.11, 0.04, 0.05);
-    g.add(arm, leg, foot);
+    proceduralMannequinGroup.add(arm, leg, foot);
   }
+  g.add(proceduralMannequinGroup);
   return g;
 }
 
+const proceduralMannequinGroup = new THREE.Group();
 const mannequin = buildMannequin();
 mannequin.position.set(0, 0, -1.9);
 mannequin.rotation.y = Math.PI;
@@ -566,19 +568,95 @@ function loadGLBModels() {
     './models/stage.glb',
     (gltf) => {
       console.log('✅ Loaded master stage.glb! Hotswapping 3D suit assets...');
+
+      // Find reference center for mannequin in Blender coordinates
+      let refX = 0.67;
+      let refZ = -0.11;
+      gltf.scene.traverse((child) => {
+        if (child.name.startsWith('MANNEQUIN') && child.position) {
+          refX = child.position.x;
+          refZ = child.position.z;
+        }
+      });
+
+      // Process MANNEQUIN_body
+      gltf.scene.traverse((child) => {
+        if (child.isMesh && child.name.startsWith('MANNEQUIN')) {
+          proceduralMannequinGroup.visible = false;
+          const bodyClone = child.clone();
+          bodyClone.position.set(child.position.x - refX, child.position.y, child.position.z - refZ);
+          bodyClone.quaternion.copy(child.quaternion);
+          bodyClone.scale.copy(child.scale);
+          bodyClone.visible = true;
+          mannequin.add(bodyClone);
+        }
+      });
+
+      // Process PART_ and EQUIPPED_ meshes
       gltf.scene.traverse((child) => {
         if (!child.isMesh) return;
 
         if (child.name.startsWith('PART_')) {
           const partId = child.name.replace('PART_', '');
-          hotswapPartGeometry(partId, child, false);
+          const gridMesh = partsById.get(partId);
+          if (gridMesh && child.geometry) {
+            gridMesh.geometry.dispose();
+            const geo = child.geometry.clone();
+            geo.center();
+
+            geo.computeBoundingBox();
+            const size = new THREE.Vector3();
+            geo.boundingBox.getSize(size);
+            const maxDim = Math.max(size.x, size.y, size.z);
+            if (maxDim > 0.28) {
+              const scaleFactor = 0.22 / maxDim;
+              geo.scale(scaleFactor, scaleFactor, scaleFactor);
+            }
+            gridMesh.geometry = geo;
+
+            geo.computeBoundingBox();
+            geo.boundingBox.getSize(size);
+            gridMesh.userData.halfH = Math.max(0.035, size.y / 2);
+
+            if (child.material) {
+              gridMesh.material = Array.isArray(child.material)
+                ? child.material.map((m) => m.clone())
+                : child.material.clone();
+            }
+          }
         } else if (child.name.startsWith('EQUIPPED_') || child.name.startsWith('FIT_')) {
-          const partId = child.name.replace('EQUIPPED_', '').replace('FIT_', '');
-          hotswapPartGeometry(partId, child, true);
-        } else if (child.name.startsWith('MANNEQUIN')) {
-          mannequin.add(child.clone());
+          let partId = child.name.replace('EQUIPPED_', '').replace('FIT_', '');
+          if (partId === 'trousers.001') partId = 'pem';
+
+          const mannequinMesh = mannequinClones.get(partId);
+          if (mannequinMesh && child.geometry) {
+            mannequinMesh.geometry.dispose();
+            mannequinMesh.geometry = child.geometry.clone();
+            mannequinMesh.position.set(
+              child.position.x - refX,
+              child.position.y,
+              child.position.z - refZ
+            );
+            mannequinMesh.quaternion.copy(child.quaternion);
+            mannequinMesh.scale.copy(child.scale);
+
+            if (child.material) {
+              mannequinMesh.material = Array.isArray(child.material)
+                ? child.material.map((m) => m.clone())
+                : child.material.clone();
+            }
+          }
         }
       });
+
+      // Update target positions for current slots with new geometry half-heights
+      for (const mesh of allPartMeshes) {
+        mesh.userData.targetPos.copy(
+          getSlotWorldPosition(mesh.userData.currentSlot, mesh.userData.halfH)
+        );
+        mesh.position.copy(mesh.userData.targetPos);
+      }
+      updateMannequinReflection();
     },
     undefined,
     () => {
@@ -591,7 +669,16 @@ function loadGLBModels() {
             gltf.scene.traverse((c) => {
               if (c.isMesh && !foundMesh) foundMesh = c;
             });
-            if (foundMesh) hotswapPartGeometry(part.id, foundMesh, false);
+            if (foundMesh) {
+              const gridMesh = partsById.get(part.id);
+              if (gridMesh) {
+                gridMesh.geometry.dispose();
+                const geo = foundMesh.geometry.clone();
+                geo.center();
+                gridMesh.geometry = geo;
+                if (foundMesh.material) gridMesh.material = foundMesh.material.clone();
+              }
+            }
           },
           undefined,
           () => {} // Silent fallback to procedural primitives
