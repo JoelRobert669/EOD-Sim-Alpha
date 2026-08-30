@@ -585,6 +585,11 @@ function loadGLBModels() {
 
           const mannequinMesh = mannequinClones.get(partId);
           if (mannequinMesh) {
+            // Reset container transform to origin (0, 0, 0)
+            mannequinMesh.position.set(0, 0, 0);
+            mannequinMesh.quaternion.identity();
+            mannequinMesh.scale.set(1, 1, 1);
+
             // Remove procedural shape and make container transparent
             mannequinMesh.geometry.dispose();
             mannequinMesh.geometry = new THREE.BufferGeometry();
