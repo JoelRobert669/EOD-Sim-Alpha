@@ -23,15 +23,15 @@ renderer.xr.enabled = true;
 document.body.appendChild(renderer.domElement);
 document.body.appendChild(XRButton.createButton(renderer));
 
-// Lights
-scene.add(new THREE.HemisphereLight(0xffffff, 0x334466, 1.3));
-const dirLight = new THREE.DirectionalLight(0xddeeff, 1.8);
+// Lights — Clean neutral white studio lighting (no blue tint on objects)
+scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.4));
+const dirLight = new THREE.DirectionalLight(0xffffff, 1.8);
 dirLight.position.set(2, 4, 2);
 scene.add(dirLight);
 
-const blueAccentLight = new THREE.PointLight(0x00e5ff, 2.5, 6);
-blueAccentLight.position.set(0, 1.2, -0.65);
-scene.add(blueAccentLight);
+const whiteAccentLight = new THREE.PointLight(0xffffff, 2.2, 6);
+whiteAccentLight.position.set(0, 1.2, -0.65);
+scene.add(whiteAccentLight);
 
 // Solid floor for VR / desktop preview
 const floor = new THREE.Mesh(
