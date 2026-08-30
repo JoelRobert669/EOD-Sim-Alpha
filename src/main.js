@@ -890,12 +890,21 @@ scene.add(progressPanel);
 
 // Shuffle Action Button inside Progress Card
 const shuffleBtn = new THREE.Mesh(
-  new THREE.PlaneGeometry(0.32, 0.09),
+  new THREE.PlaneGeometry(0.26, 0.09),
   new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })
 );
-shuffleBtn.position.set(0, -0.075, 0.01);
+shuffleBtn.position.set(-0.14, -0.075, 0.01);
 shuffleBtn.userData.isReset = true;
 progressPanel.add(shuffleBtn);
+
+// Exit XR Action Button inside Progress Card
+const exitBtn = new THREE.Mesh(
+  new THREE.PlaneGeometry(0.26, 0.09),
+  new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })
+);
+exitBtn.position.set(0.14, -0.075, 0.01);
+exitBtn.userData.isExit = true;
+progressPanel.add(exitBtn);
 
 // Unified references for legacy event handling
 const hud = objectivePanel;
@@ -1057,19 +1066,29 @@ function updateHUD(correctCount = 0) {
     progCtx.stroke();
   }
 
-  // Large Pill-Shaped SHUFFLE Button
-  const btnX = 380;
+  // Dual Action Buttons: SHUFFLE and EXIT XR
   const btnY = 560;
-  const btnW = 840;
   const btnH = 200;
-  drawVisionOSGlass(progCtx, btnX, btnY, btnW, btnH, 100, { bgAlpha: 0.88, borderAlpha: 0.55, shadow: true });
+  const btnW = 660;
 
-  // Shuffle Icon & Text
+  // 1. SHUFFLE Button
+  const shufX = 90;
+  drawVisionOSGlass(progCtx, shufX, btnY, btnW, btnH, 100, { bgAlpha: 0.88, borderAlpha: 0.55, shadow: true });
   progCtx.fillStyle = '#ffffff';
-  progCtx.font = '900 76px "Plus Jakarta Sans", "Inter", -apple-system, sans-serif';
+  progCtx.font = '800 68px "Plus Jakarta Sans", "Inter", -apple-system, sans-serif';
   progCtx.textAlign = 'center';
   progCtx.textBaseline = 'middle';
-  progCtx.fillText('↝  SHUFFLE', btnX + btnW / 2, btnY + btnH / 2);
+  progCtx.fillText('↝  SHUFFLE', shufX + btnW / 2, btnY + btnH / 2);
+
+  // 2. EXIT XR Button
+  const exitX = 850;
+  drawVisionOSGlass(progCtx, exitX, btnY, btnW, btnH, 100, { bgAlpha: 0.88, borderAlpha: 0.65, shadow: true });
+  progCtx.fillStyle = '#f87171';
+  progCtx.font = '800 68px "Plus Jakarta Sans", "Inter", -apple-system, sans-serif';
+  progCtx.textAlign = 'center';
+  progCtx.textBaseline = 'middle';
+  progCtx.fillText('✕  EXIT XR', exitX + btnW / 2, btnY + btnH / 2);
+
   progTexture.needsUpdate = true;
 }
 
@@ -1307,6 +1326,7 @@ function pickFromRay(origin, direction) {
     ...allPartMeshes,
     ...slotPads,
     shuffleBtn,
+    exitBtn,
     objectivePanel,
     progressPanel,
     mannequinRotateRing,
@@ -1390,6 +1410,16 @@ function onVRSelectStart(controller) {
   const hitData = pick(controller);
   if (!hitData) return;
   const hit = hitData.object;
+
+  if (hit === exitBtn || hit?.userData?.isExit) {
+    if (renderer.xr.isPresenting) {
+      renderer.xr.getSession()?.end();
+    } else {
+      window.close();
+      window.location.href = 'about:blank';
+    }
+    return;
+  }
 
   if (hit === shuffleBtn || hit?.userData?.isReset) {
     shuffleAndAssign();
@@ -1790,10 +1820,17 @@ renderer.domElement.addEventListener('pointerdown', (e) => {
   const hitData = pickFromRay(raycaster.ray.origin, raycaster.ray.direction);
   const hit = hitData ? hitData.object : null;
 
+  if (hit === exitBtn || hit?.userData?.isExit) {
+    if (renderer.xr.isPresenting) {
+      renderer.xr.getSession()?.end();
+    } else {
+      window.close();
+      window.location.href = 'about:blank';
+    }
+    return;
+  }
+
   if (hit === shuffleBtn || hit === resetBtn || hit?.userData?.isReset) {
-    shuffleAndAssign();
-  } else if (hit === progressPanel) {
-    // If clicked on lower region of progress panel (shuffle button)
     shuffleAndAssign();
   } else if (hit === objectivePanel) {
     isDraggingUI = true;
@@ -1938,7 +1975,17 @@ renderer.domElement.addEventListener('click', (e) => {
   const hitData = pickFromRay(raycaster.ray.origin, raycaster.ray.direction);
   const hit = hitData ? hitData.object : null;
 
-  if (hit === shuffleBtn || hit === resetBtn || hit === progressPanel || hit?.userData?.isReset) {
+  if (hit === exitBtn || hit?.userData?.isExit) {
+    if (renderer.xr.isPresenting) {
+      renderer.xr.getSession()?.end();
+    } else {
+      window.close();
+      window.location.href = 'about:blank';
+    }
+    return;
+  }
+
+  if (hit === shuffleBtn || hit === resetBtn || hit?.userData?.isReset) {
     shuffleAndAssign();
     return;
   }

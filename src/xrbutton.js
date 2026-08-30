@@ -214,6 +214,14 @@ export class XRButton {
           warn.style.cursor = 'not-allowed';
           btnRow.appendChild(warn);
         }
+        const exitBtn = createGlassBtn('✕ Exit', false, () => {
+          window.close();
+          window.location.href = 'about:blank';
+        });
+        exitBtn.style.background = 'linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(185, 28, 28, 0.3))';
+        exitBtn.style.borderColor = 'rgba(248, 113, 113, 0.4)';
+        exitBtn.style.color = '#fca5a5';
+        btnRow.appendChild(exitBtn);
       });
     }
 
