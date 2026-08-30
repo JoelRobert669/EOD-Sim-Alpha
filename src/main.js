@@ -2009,7 +2009,7 @@ renderer.domElement.addEventListener('click', (e) => {
   const hitData = pickFromRay(raycaster.ray.origin, raycaster.ray.direction);
   const hit = hitData ? hitData.object : null;
 
-  if (hit === resetBtn) {
+  if (hit === shuffleBtn || hit === resetBtn || hit === progressPanel || hit === utilityPanel || hit?.userData?.isReset) {
     shuffleAndAssign();
     return;
   }
