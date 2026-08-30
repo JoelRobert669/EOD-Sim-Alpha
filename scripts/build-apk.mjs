@@ -37,8 +37,8 @@ async function build() {
     startUrl: "/",
     iconUrl: "http://localhost:8888/icon-512.png",
     maskableIconUrl: "http://localhost:8888/maskable-icon-512.png",
-    appVersionName: "1.1.0",
-    appVersionCode: 2,
+    appVersionName: "1.2.0",
+    appVersionCode: 3,
     signingKey: {
       path: path.join(projectDir, "eod-release.keystore"),
       alias: "eodkey"
