@@ -102,7 +102,7 @@ mannequinShadow.position.y = 0.002;
 mannequinShadow.userData.isMannequin = true;
 mannequin.add(mannequinShadow);
 
-// Cyber Base Ring under Mannequin for grasping & visual anchor
+// Cyber Base Ring under Mannequin for grasping & translation
 const ringGeo = new THREE.RingGeometry(0.38, 0.42, 48);
 const ringMat = new THREE.MeshBasicMaterial({
   color: 0x00e5ff,
@@ -117,9 +117,37 @@ mannequinRing.position.y = 0.004;
 mannequinRing.userData.isMannequin = true;
 mannequin.add(mannequinRing);
 
-// Mannequin invisible interaction collider cylinder (height 1.85m, radius 0.42m)
+// Outer Cyber Rotation Ring Gizmo (Drag/Twist to rotate mannequin)
+const rotateRingGeo = new THREE.RingGeometry(0.46, 0.52, 48);
+const rotateRingMat = new THREE.MeshBasicMaterial({
+  color: 0x38bdf8,
+  transparent: true,
+  opacity: 0.65,
+  side: THREE.DoubleSide,
+  depthWrite: false,
+});
+const mannequinRotateRing = new THREE.Mesh(rotateRingGeo, rotateRingMat);
+mannequinRotateRing.rotation.x = -Math.PI / 2;
+mannequinRotateRing.position.y = 0.005;
+mannequinRotateRing.userData.isMannequinRotate = true;
+mannequin.add(mannequinRotateRing);
+
+// 4 Directional Chevron Tick Markers on the Rotation Ring
+for (let i = 0; i < 4; i++) {
+  const angle = (i * Math.PI) / 2;
+  const tick = new THREE.Mesh(
+    new THREE.BoxGeometry(0.024, 0.006, 0.08),
+    new THREE.MeshBasicMaterial({ color: 0x00ffff })
+  );
+  tick.position.set(Math.cos(angle) * 0.49, 0.006, Math.sin(angle) * 0.49);
+  tick.rotation.y = -angle;
+  tick.userData.isMannequinRotate = true;
+  mannequin.add(tick);
+}
+
+// Mannequin invisible interaction collider cylinder (height 1.85m, radius 0.45m)
 const mannequinCollider = new THREE.Mesh(
-  new THREE.CylinderGeometry(0.42, 0.45, 1.85, 16),
+  new THREE.CylinderGeometry(0.45, 0.48, 1.85, 16),
   new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })
 );
 mannequinCollider.position.y = 0.925;
@@ -398,10 +426,15 @@ function initFormingParticles() {
   formGeo.attributes.position.needsUpdate = true;
 }
 
-// --- Holographic Equipment Particle Burst FX & Shockwave (When new part equips onto body) ---
-const NUM_EQUIP_PARTICLES = 120;
+// --- 3D Volumetric Holographic Equipment FX System ---
+const NUM_EQUIP_PARTICLES = 250;
 const equipPositions = new Float32Array(NUM_EQUIP_PARTICLES * 3);
 const equipVelocities = new Float32Array(NUM_EQUIP_PARTICLES * 3);
+const equipAngles = new Float32Array(NUM_EQUIP_PARTICLES);
+const equipRadii = new Float32Array(NUM_EQUIP_PARTICLES);
+const equipOrbitalSpeeds = new Float32Array(NUM_EQUIP_PARTICLES);
+const equipBaseWorldPos = new THREE.Vector3();
+
 for (let i = 0; i < NUM_EQUIP_PARTICLES; i++) {
   equipPositions[i * 3 + 1] = -100;
 }
@@ -409,7 +442,7 @@ const equipGeo = new THREE.BufferGeometry();
 equipGeo.setAttribute('position', new THREE.BufferAttribute(equipPositions, 3));
 const equipMat = new THREE.PointsMaterial({
   color: 0x00ffff,
-  size: 0.12,
+  size: 0.15,
   map: particleTexture,
   transparent: true,
   opacity: 0,
@@ -420,8 +453,21 @@ const equipMat = new THREE.PointsMaterial({
 const equipParticleSystem = new THREE.Points(equipGeo, equipMat);
 scene.add(equipParticleSystem);
 
-// Expanding Holographic Shockwave Ring on Equip
-const shockwaveRingGeo = new THREE.RingGeometry(0.06, 0.10, 36);
+// 3D Volumetric Holographic Scan Wireframe Cylinder
+const holoScanGeo = new THREE.CylinderGeometry(0.24, 0.28, 0.45, 16, 6, true);
+const holoScanMat = new THREE.MeshBasicMaterial({
+  color: 0x00ffff,
+  wireframe: true,
+  transparent: true,
+  opacity: 0,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+});
+const holoScanCage = new THREE.Mesh(holoScanGeo, holoScanMat);
+scene.add(holoScanCage);
+
+// Primary Horizontal Shockwave Ring
+const shockwaveRingGeo = new THREE.RingGeometry(0.06, 0.12, 36);
 const shockwaveRingMat = new THREE.MeshBasicMaterial({
   color: 0x00ffff,
   transparent: true,
@@ -434,9 +480,16 @@ const shockwaveRing = new THREE.Mesh(shockwaveRingGeo, shockwaveRingMat);
 shockwaveRing.rotation.x = -Math.PI / 2;
 scene.add(shockwaveRing);
 
+// Secondary Tilted 3D Shockwave Ring (Cross-orbital spherical shell effect)
+const shockwaveRing2 = new THREE.Mesh(shockwaveRingGeo, shockwaveRingMat);
+shockwaveRing2.rotation.x = -Math.PI / 4;
+shockwaveRing2.rotation.y = Math.PI / 4;
+scene.add(shockwaveRing2);
+
 let isEquipFxActive = false;
 let equipFxTimer = 0;
-const EQUIP_FX_DURATION = 1.0;
+const EQUIP_FX_DURATION = 1.1;
+let activeEquipClone = null;
 
 function getEquipWorldPosition(partId) {
   const clone = mannequinClones.get(partId);
@@ -455,24 +508,42 @@ function getEquipWorldPosition(partId) {
   return new THREE.Vector3(manPos.x, manPos.y + anchorY, manPos.z);
 }
 
-function triggerEquipFX(worldPos) {
+function triggerEquipFX(worldPos, cloneMesh = null) {
   isEquipFxActive = true;
   equipFxTimer = 0;
+  equipBaseWorldPos.copy(worldPos);
+  activeEquipClone = cloneMesh;
+
+  if (activeEquipClone) {
+    setEmissive(activeEquipClone, 0x00ffff, 2.8);
+  }
+
   equipMat.opacity = 1.0;
+  holoScanMat.opacity = 0.85;
+  holoScanCage.position.copy(worldPos);
+  holoScanCage.scale.set(0.6, 0.6, 0.6);
+
   shockwaveRing.position.copy(worldPos);
   shockwaveRing.scale.set(1, 1, 1);
-  shockwaveRingMat.opacity = 0.9;
+  shockwaveRing2.position.copy(worldPos);
+  shockwaveRing2.scale.set(1, 1, 1);
+  shockwaveRingMat.opacity = 0.95;
 
   for (let i = 0; i < NUM_EQUIP_PARTICLES; i++) {
-    equipPositions[i * 3 + 0] = worldPos.x + (Math.random() - 0.5) * 0.15;
-    equipPositions[i * 3 + 1] = worldPos.y + (Math.random() - 0.5) * 0.15;
-    equipPositions[i * 3 + 2] = worldPos.z + (Math.random() - 0.5) * 0.15;
-
     const angle = Math.random() * Math.PI * 2;
-    const speed = 0.4 + Math.random() * 0.8;
-    equipVelocities[i * 3 + 0] = Math.cos(angle) * speed;
-    equipVelocities[i * 3 + 1] = 0.2 + Math.random() * 0.9; // swirling upward spark
-    equipVelocities[i * 3 + 2] = Math.sin(angle) * speed;
+    const radius = 0.06 + Math.random() * 0.26;
+    equipAngles[i] = angle;
+    equipRadii[i] = radius;
+    equipOrbitalSpeeds[i] = (Math.random() > 0.5 ? 1 : -1) * (4.0 + Math.random() * 6.0);
+
+    const spawnY = worldPos.y + (Math.random() - 0.5) * 0.35;
+    equipPositions[i * 3 + 0] = worldPos.x + Math.cos(angle) * radius;
+    equipPositions[i * 3 + 1] = spawnY;
+    equipPositions[i * 3 + 2] = worldPos.z + Math.sin(angle) * radius;
+
+    equipVelocities[i * 3 + 0] = (Math.random() - 0.5) * 0.4;
+    equipVelocities[i * 3 + 1] = 0.3 + Math.random() * 0.85; // ascending spiral stream
+    equipVelocities[i * 3 + 2] = (Math.random() - 0.5) * 0.4;
   }
   equipGeo.attributes.position.needsUpdate = true;
 }
@@ -1123,7 +1194,7 @@ function updateMannequinReflection() {
         if (!equippedState.get(partId)) {
           equippedState.set(partId, true);
           const equipPos = getEquipWorldPosition(partId);
-          triggerEquipFX(equipPos);
+          triggerEquipFX(equipPos, clone);
         }
       }
     } else {
@@ -1156,7 +1227,7 @@ function updateMannequinReflection() {
 // Initial Shuffle & Materialization
 shuffleAndAssign();
 
-// --- Drag & Drop / Swapping State ---
+// --- Drag & Drop / Swapping / Rotation State ---
 let grabbedItem = null;
 let grabController = null;
 let hoveredSlotIndex = -1;
@@ -1166,8 +1237,11 @@ let uiGrabDist = 1.6;
 let isDraggingUI = false;
 
 let isDraggingMannequin = false;
+let isRotatingMannequin = false;
 let mannequinGrabController = null;
 let mannequinGrabDist = 2.0;
+let mannequinRotateStartAngle = 0;
+let mannequinInitialRotY = 0;
 
 const raycaster = new THREE.Raycaster();
 const controllers = [];
@@ -1250,6 +1324,7 @@ function pickFromRay(origin, direction) {
     ...slotPads,
     resetBtn,
     hud,
+    mannequinRotateRing,
     mannequinCollider,
     mannequinRing,
     mannequinShadow,
@@ -1343,6 +1418,16 @@ function onVRSelectStart(controller) {
     return;
   }
 
+  // Rotation ring grabbed
+  if (hit === mannequinRotateRing || hit?.userData?.isMannequinRotate) {
+    isRotatingMannequin = true;
+    mannequinGrabController = controller;
+    const hitPt = hitData.point;
+    mannequinRotateStartAngle = Math.atan2(hitPt.x - mannequin.position.x, hitPt.z - mannequin.position.z);
+    mannequinInitialRotY = mannequin.rotation.y;
+    return;
+  }
+
   if (
     hit === mannequinCollider ||
     hit === mannequinRing ||
@@ -1370,8 +1455,9 @@ function onVRSelectEnd(controller) {
     uiGrabController = null;
   }
 
-  if (isDraggingMannequin && mannequinGrabController === controller) {
+  if ((isDraggingMannequin || isRotatingMannequin) && mannequinGrabController === controller) {
     isDraggingMannequin = false;
+    isRotatingMannequin = false;
     mannequinGrabController = null;
   }
 
@@ -1406,10 +1492,19 @@ function updateLocomotion(dt) {
   if (!session) return;
   snapCooldown -= dt;
   for (const source of session.inputSources) {
-    if (!source.gamepad || !source.handedness) continue;
+    if (!source.gamepad) continue;
     const axes = source.gamepad.axes;
     const x = axes[2] ?? 0;
     const y = axes[3] ?? 0;
+
+    // If currently manipulating mannequin, thumbstick rotates mannequin!
+    if (isDraggingMannequin || isRotatingMannequin) {
+      if (Math.abs(x) > 0.15) {
+        mannequin.rotation.y += x * dt * 3.0;
+      }
+      continue;
+    }
+
     if (source.handedness === 'left') {
       const forward = new THREE.Vector3();
       camera.getWorldDirection(forward);
@@ -1447,32 +1542,60 @@ function animate() {
   frameMat.emissiveIntensity = isForming ? frameMat.emissiveIntensity : (0.7 + Math.sin(t * 3.0) * 0.3);
   nodeMat.size = 0.020 + Math.sin(t * 3.5) * 0.006;
   mannequinRing.material.opacity = 0.55 + Math.sin(t * 2.5) * 0.25;
+  mannequinRotateRing.material.opacity = 0.6 + Math.sin(t * 2.0) * 0.2;
 
-  // Equipment Particle FX & Shockwave Wave Update
+  // 3D Volumetric Equipment Particle FX & Holographic Scan Update
   if (isEquipFxActive) {
     equipFxTimer += dt;
     const ep = Math.min(1, equipFxTimer / EQUIP_FX_DURATION);
     const easeOut = 1 - Math.pow(1 - ep, 3);
+
+    // Particle alpha fade
     equipMat.opacity = Math.max(0, (1.0 - ep) * 1.3);
 
-    // Expanding Holographic Shockwave
-    const ringScale = 1.0 + easeOut * 7.0;
-    shockwaveRing.scale.set(ringScale, ringScale, ringScale);
-    shockwaveRingMat.opacity = Math.max(0, (1.0 - ep) * 0.9);
+    // Holographic Wireframe Cage Scan
+    holoScanCage.rotation.y += dt * 4.5;
+    holoScanCage.position.y = equipBaseWorldPos.y + (ep - 0.5) * 0.15;
+    const cageScale = 0.7 + easeOut * 0.6;
+    holoScanCage.scale.set(cageScale, 1.0 + easeOut * 0.3, cageScale);
+    holoScanMat.opacity = Math.max(0, (1.0 - ep * 1.1) * 0.85);
 
+    // Dual Expanding Shockwaves
+    const ringScale = 1.0 + easeOut * 6.5;
+    shockwaveRing.scale.set(ringScale, ringScale, ringScale);
+    shockwaveRing2.scale.set(ringScale * 0.85, ringScale * 0.85, ringScale * 0.85);
+    shockwaveRing2.rotation.z += dt * 2.5;
+    shockwaveRingMat.opacity = Math.max(0, (1.0 - ep) * 0.95);
+
+    // Fade suit piece emissive flare
+    if (activeEquipClone) {
+      setEmissive(activeEquipClone, 0x00ffff, Math.max(0, 2.8 * (1.0 - ep * 1.4)));
+    }
+
+    // 3D Volumetric Spiral Vortex Physics
     for (let i = 0; i < NUM_EQUIP_PARTICLES; i++) {
-      equipPositions[i * 3 + 0] += equipVelocities[i * 3 + 0] * dt;
-      equipPositions[i * 3 + 1] += equipVelocities[i * 3 + 1] * dt;
-      equipPositions[i * 3 + 2] += equipVelocities[i * 3 + 2] * dt;
-      equipVelocities[i * 3 + 0] *= 0.96;
-      equipVelocities[i * 3 + 1] *= 0.96;
-      equipVelocities[i * 3 + 2] *= 0.96;
+      equipAngles[i] += equipOrbitalSpeeds[i] * dt;
+      equipRadii[i] += 0.18 * dt; // expanding spiral radius
+
+      const px = equipBaseWorldPos.x + Math.cos(equipAngles[i]) * equipRadii[i] + equipVelocities[i * 3 + 0] * (equipFxTimer * 0.5);
+      const py = equipPositions[i * 3 + 1] + equipVelocities[i * 3 + 1] * dt;
+      const pz = equipBaseWorldPos.z + Math.sin(equipAngles[i]) * equipRadii[i] + equipVelocities[i * 3 + 2] * (equipFxTimer * 0.5);
+
+      equipPositions[i * 3 + 0] = px;
+      equipPositions[i * 3 + 1] = py;
+      equipPositions[i * 3 + 2] = pz;
     }
     equipGeo.attributes.position.needsUpdate = true;
+
     if (equipFxTimer >= EQUIP_FX_DURATION) {
       isEquipFxActive = false;
       equipMat.opacity = 0;
+      holoScanMat.opacity = 0;
       shockwaveRingMat.opacity = 0;
+      if (activeEquipClone) {
+        setEmissive(activeEquipClone, 0x000000, 0);
+        activeEquipClone = null;
+      }
     }
   }
 
@@ -1588,7 +1711,21 @@ function animate() {
       grabbedUI.lookAt(camera.getWorldPosition(new THREE.Vector3()));
     }
 
-    if (isDraggingMannequin && mannequinGrabController) {
+    if (isRotatingMannequin && mannequinGrabController) {
+      const rayOrigin = mannequinGrabController.getWorldPosition(new THREE.Vector3());
+      const rayDir = new THREE.Vector3(0, 0, -1).applyQuaternion(
+        mannequinGrabController.getWorldQuaternion(new THREE.Quaternion())
+      );
+      if (Math.abs(rayDir.y) > 0.02) {
+        const dist = -rayOrigin.y / rayDir.y;
+        if (dist > 0 && dist < 8) {
+          const pt = rayOrigin.clone().addScaledVector(rayDir, dist);
+          const currentAngle = Math.atan2(pt.x - mannequin.position.x, pt.z - mannequin.position.z);
+          const deltaAngle = currentAngle - mannequinRotateStartAngle;
+          mannequin.rotation.y = mannequinInitialRotY + deltaAngle;
+        }
+      }
+    } else if (isDraggingMannequin && mannequinGrabController) {
       const rayOrigin = mannequinGrabController.getWorldPosition(new THREE.Vector3());
       const rayDir = new THREE.Vector3(0, 0, -1).applyQuaternion(
         mannequinGrabController.getWorldQuaternion(new THREE.Quaternion())
@@ -1642,12 +1779,15 @@ function animate() {
 }
 renderer.setAnimationLoop(animate);
 
-// --- Desktop Preview Controls (Drag & Drop + Click to Swap + Mannequin Drag) ---
+// --- Desktop Preview Controls (Drag & Drop + Click to Swap + Mannequin Drag/Rotate) ---
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
 });
+
+// Disable default context menu so right click drag rotates smoothly
+renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
 
 const mouse = new THREE.Vector2();
 let mouseHovered = null;
@@ -1692,6 +1832,16 @@ renderer.domElement.addEventListener('pointerdown', (e) => {
   } else if (hit === hud) {
     isDraggingUI = true;
   } else if (
+    e.button === 2 ||
+    (e.button === 0 && e.shiftKey) ||
+    hit === mannequinRotateRing ||
+    hit?.userData?.isMannequinRotate
+  ) {
+    // Rotate mannequin with Right Click, Shift+Click, or clicking rotation ring
+    isRotatingMannequin = true;
+    lastX = e.clientX;
+    lastY = e.clientY;
+  } else if (
     hit === mannequinCollider ||
     hit === mannequinRing ||
     hit === mannequinShadow ||
@@ -1720,6 +1870,10 @@ addEventListener('pointerup', (e) => {
 
   if (isDraggingMannequin) {
     isDraggingMannequin = false;
+  }
+
+  if (isRotatingMannequin) {
+    isRotatingMannequin = false;
   }
 
   if (isDraggingPart && grabbedItem) {
@@ -1753,6 +1907,14 @@ renderer.domElement.addEventListener('pointermove', (e) => {
       hud.position.copy(panelPoint);
       hud.lookAt(camera.position);
     }
+    return;
+  }
+
+  if (isRotatingMannequin) {
+    const deltaX = e.clientX - lastX;
+    mannequin.rotation.y += deltaX * 0.015;
+    lastX = e.clientX;
+    lastY = e.clientY;
     return;
   }
 
