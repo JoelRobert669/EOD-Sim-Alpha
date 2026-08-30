@@ -1,18 +1,18 @@
 export const SLOT_POSITIONS = [
-  // Row 1 (Back, Z = -0.27)
-  { index: 0, pos: [-0.48, 0, -0.27], label: '01' },
-  { index: 1, pos: [-0.16, 0, -0.27], label: '02' },
-  { index: 2, pos: [ 0.16, 0, -0.27], label: '03' },
-  { index: 3, pos: [ 0.48, 0, -0.27], label: '04' },
+  // Row 1 (Back, Z = -0.24)
+  { index: 0, pos: [-0.48, 0, -0.24], label: '01' },
+  { index: 1, pos: [-0.16, 0, -0.24], label: '02' },
+  { index: 2, pos: [ 0.16, 0, -0.24], label: '03' },
+  { index: 3, pos: [ 0.48, 0, -0.24], label: '04' },
   // Row 2 (Middle, Z = 0.00)
-  { index: 4, pos: [-0.48, 0, 0.00], label: '05' },
-  { index: 5, pos: [-0.16, 0, 0.00], label: '06' },
-  { index: 6, pos: [ 0.16, 0, 0.00], label: '07' },
-  { index: 7, pos: [ 0.48, 0, 0.00], label: '08' },
-  // Row 3 (Front, Z = +0.27) - Centered 3 slots
-  { index: 8, pos: [-0.32, 0, 0.27], label: '09' },
-  { index: 9, pos: [ 0.00, 0, 0.27], label: '10' },
-  { index: 10, pos: [ 0.32, 0, 0.27], label: '11' },
+  { index: 4, pos: [-0.48, 0,  0.00], label: '05' },
+  { index: 5, pos: [-0.16, 0,  0.00], label: '06' },
+  { index: 6, pos: [ 0.16, 0,  0.00], label: '07' },
+  { index: 7, pos: [ 0.48, 0,  0.00], label: '08' },
+  // Row 3 (Front, Z = +0.24) - Centered 3 slots
+  { index: 8, pos: [-0.32, 0,  0.24], label: '09' },
+  { index: 9, pos: [ 0.00, 0,  0.24], label: '10' },
+  { index: 10, pos: [ 0.32, 0,  0.24], label: '11' },
 ];
 
 export const PARTS = [

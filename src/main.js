@@ -529,38 +529,23 @@ for (const part of PARTS) {
   mesh.userData.label = label;
 }
 
+function setEmissive(mesh, colorHex, intensity = 1.0) {
+  if (!mesh) return;
+  mesh.traverse((c) => {
+    if (c.isMesh && c.material) {
+      const mats = Array.isArray(c.material) ? c.material : [c.material];
+      for (const m of mats) {
+        if (m && m.emissive) {
+          m.emissive.setHex(colorHex);
+          m.emissiveIntensity = intensity;
+        }
+      }
+    }
+  });
+}
+
 // --- GLTF / GLB Model Hotswapper ---
 const gltfLoader = new GLTFLoader();
-
-function hotswapPartGeometry(partId, sourceMesh, isEquipped = false) {
-  const gridMesh = partsById.get(partId);
-  const mannequinMesh = mannequinClones.get(partId);
-
-  if (!isEquipped && gridMesh && sourceMesh.geometry) {
-    gridMesh.geometry.dispose();
-    gridMesh.geometry = sourceMesh.geometry.clone();
-    if (sourceMesh.material) {
-      gridMesh.material = Array.isArray(sourceMesh.material)
-        ? sourceMesh.material.map((m) => m.clone())
-        : sourceMesh.material.clone();
-    }
-  }
-
-  if (mannequinMesh && sourceMesh.geometry) {
-    mannequinMesh.geometry.dispose();
-    mannequinMesh.geometry = sourceMesh.geometry.clone();
-    if (isEquipped) {
-      mannequinMesh.position.copy(sourceMesh.position);
-      mannequinMesh.quaternion.copy(sourceMesh.quaternion);
-      mannequinMesh.scale.copy(sourceMesh.scale);
-    }
-    if (sourceMesh.material) {
-      mannequinMesh.material = Array.isArray(sourceMesh.material)
-        ? sourceMesh.material.map((m) => m.clone())
-        : sourceMesh.material.clone();
-    }
-  }
-}
 
 function loadGLBModels() {
   // 1. Try master stage.glb
@@ -573,15 +558,15 @@ function loadGLBModels() {
       let refX = 0.67;
       let refZ = -0.11;
       gltf.scene.traverse((child) => {
-        if (child.name.startsWith('MANNEQUIN') && child.position) {
+        if (child.name && child.name.startsWith('MANNEQUIN') && child.position) {
           refX = child.position.x;
           refZ = child.position.z;
         }
       });
 
-      // Process MANNEQUIN_body
+      // 1. Process MANNEQUIN_body
       gltf.scene.traverse((child) => {
-        if (child.isMesh && child.name.startsWith('MANNEQUIN')) {
+        if (child.isMesh && child.name && child.name.startsWith('MANNEQUIN')) {
           proceduralMannequinGroup.visible = false;
           const bodyClone = child.clone();
           bodyClone.position.set(child.position.x - refX, child.position.y, child.position.z - refZ);
@@ -592,9 +577,9 @@ function loadGLBModels() {
         }
       });
 
-      // Process PART_ and EQUIPPED_ meshes
+      // 2. Process PART_ and EQUIPPED_ meshes
       gltf.scene.traverse((child) => {
-        if (!child.isMesh) return;
+        if (!child.isMesh || !child.name) return;
 
         if (child.name.startsWith('PART_')) {
           const partId = child.name.replace('PART_', '');
@@ -608,8 +593,8 @@ function loadGLBModels() {
             const size = new THREE.Vector3();
             geo.boundingBox.getSize(size);
             const maxDim = Math.max(size.x, size.y, size.z);
-            if (maxDim > 0.28) {
-              const scaleFactor = 0.22 / maxDim;
+            if (maxDim > 0.24) {
+              const scaleFactor = 0.18 / maxDim;
               geo.scale(scaleFactor, scaleFactor, scaleFactor);
             }
             gridMesh.geometry = geo;
@@ -931,10 +916,7 @@ function triggerFormingAnimation() {
     mesh.userData.spawnDelay = i * 0.045; // Staggered entry
     mesh.scale.set(0.001, 0.001, 0.001);
     mesh.position.y = mesh.userData.targetPos.y + 0.35;
-    if (mesh.material && mesh.material.emissive) {
-      mesh.material.emissive.setHex(0x00e5ff);
-      mesh.material.emissiveIntensity = 2.0;
-    }
+    setEmissive(mesh, 0x00e5ff, 2.0);
     if (mesh.userData.label) {
       mesh.userData.label.scale.set(0.001, 0.001, 0.001);
     }
@@ -974,13 +956,15 @@ function updateMannequinReflection() {
 
     if (isCorrect) {
       correctCount++;
-      mannequinClones.get(mesh.userData.part.id).visible = true;
+      const clone = mannequinClones.get(mesh.userData.part.id);
+      if (clone) clone.visible = true;
       if (mesh.userData.label) {
         mesh.userData.label.visible = true;
       }
     } else {
       if (mesh) {
-        mannequinClones.get(mesh.userData.part.id).visible = false;
+        const clone = mannequinClones.get(mesh.userData.part.id);
+        if (clone) clone.visible = false;
       }
     }
   }
@@ -989,16 +973,20 @@ function updateMannequinReflection() {
   for (const part of PARTS) {
     const mesh = partsById.get(part.id);
     if (!mesh || mesh.userData.currentSlot !== part.targetSlot) {
-      mannequinClones.get(part.id).visible = false;
+      const clone = mannequinClones.get(part.id);
+      if (clone) clone.visible = false;
     }
   }
 
-  if (correctCount === PARTS.length) {
-    gameState = 'won';
+  if (correctCount === PARTS.length && gameState === 'playing') {
+    gameState = 'victory';
   }
 
   updateHUD(correctCount);
 }
+
+// Initial Shuffle & Materialization
+shuffleAndAssign();
 
 // --- Drag & Drop / Swapping State ---
 let grabbedItem = null;
@@ -1181,7 +1169,7 @@ function onVRSelectStart(controller) {
     grabbedItem = hit;
     grabController = controller;
     grabbedItem.userData.isGrabbed = true;
-    grabbedItem.material.emissive.setHex(0x00e5ff);
+    setEmissive(grabbedItem, 0x00e5ff, 1.0);
   }
 }
 
@@ -1203,7 +1191,7 @@ function onVRSelectEnd(controller) {
       );
     }
 
-    grabbedItem.material.emissive.setHex(0x000000);
+    setEmissive(grabbedItem, 0x000000, 0);
     grabbedItem.userData.isGrabbed = false;
     grabbedItem = null;
     grabController = null;
@@ -1316,10 +1304,7 @@ function animate() {
       mesh.position.z = mesh.userData.targetPos.z;
 
       // Flare fade
-      if (mesh.material && mesh.material.emissive) {
-        mesh.material.emissiveIntensity = Math.max(0, 2.0 * (1 - itemP));
-        if (itemP >= 1) mesh.material.emissive.setHex(0x000000);
-      }
+      setEmissive(mesh, itemP >= 1 ? 0x000000 : 0x00e5ff, Math.max(0, 2.0 * (1 - itemP)));
 
       if (itemP < 1) allFinished = false;
     }
@@ -1332,10 +1317,7 @@ function animate() {
       for (const mesh of allPartMeshes) {
         mesh.scale.set(1, 1, 1);
         if (mesh.userData.label) mesh.userData.label.scale.set(1, 1, 1);
-        if (mesh.material && mesh.material.emissive) {
-          mesh.material.emissive.setHex(0x000000);
-          mesh.material.emissiveIntensity = 0;
-        }
+        setEmissive(mesh, 0x000000, 0);
       }
     }
   } else {
@@ -1392,8 +1374,8 @@ function animate() {
       const hit = hitData ? hitData.object : null;
       const prev = controller.userData.hovered;
       if (prev && prev !== hit) {
-        if (prev.material && prev.material.emissive && !prev.userData.isGrabbed) {
-          prev.material.emissive.setHex(0x000000);
+        if (!prev.userData.isGrabbed) {
+          setEmissive(prev, 0x000000, 0);
         }
         controller.userData.hovered = null;
       }
@@ -1402,16 +1384,11 @@ function animate() {
       }
       if (controller.userData.hovered && !controller.userData.hovered.userData.isGrabbed) {
         const h = controller.userData.hovered;
-        if (h.material && h.material.emissive) {
-          h.material.emissive.setHex(h.userData.isReset ? 0x0077aa : 0x00e5ff);
-          h.material.emissiveIntensity = 0.8 + Math.sin(t * 8) * 0.4;
-        }
+        setEmissive(h, h.userData.isReset ? 0x0077aa : 0x00e5ff, 0.8 + Math.sin(t * 8) * 0.4);
       }
     }
   } else if (mouseHovered && !mouseHovered.userData.isGrabbed) {
-    if (mouseHovered.material && mouseHovered.material.emissive) {
-      mouseHovered.material.emissiveIntensity = 0.8 + Math.sin(t * 8) * 0.4;
-    }
+    setEmissive(mouseHovered, mouseHovered.userData.isReset ? 0x0077aa : 0x00e5ff, 0.8 + Math.sin(t * 8) * 0.4);
   }
 
   renderer.render(scene, camera);
@@ -1472,7 +1449,7 @@ renderer.domElement.addEventListener('pointerdown', (e) => {
     grabbedItem = hit;
     isDraggingPart = true;
     grabbedItem.userData.isGrabbed = true;
-    grabbedItem.material.emissive.setHex(0x00e5ff);
+    setEmissive(grabbedItem, 0x00e5ff, 1.0);
   } else if (e.button === 0 && !hit) {
     draggingCam = true;
     lastX = e.clientX;
@@ -1496,7 +1473,7 @@ addEventListener('pointerup', (e) => {
         getSlotWorldPosition(grabbedItem.userData.currentSlot, grabbedItem.userData.halfH)
       );
     }
-    grabbedItem.material.emissive.setHex(0x000000);
+    setEmissive(grabbedItem, 0x000000, 0);
     grabbedItem.userData.isGrabbed = false;
     grabbedItem = null;
     isDraggingPart = false;
@@ -1544,16 +1521,14 @@ renderer.domElement.addEventListener('pointermove', (e) => {
   const hit = hitData ? hitData.object : null;
 
   if (mouseHovered && mouseHovered !== hit) {
-    if (mouseHovered.material && mouseHovered.material.emissive && !mouseHovered.userData.isGrabbed) {
-      mouseHovered.material.emissive.setHex(0x000000);
+    if (!mouseHovered.userData.isGrabbed) {
+      setEmissive(mouseHovered, 0x000000, 0);
     }
     mouseHovered = null;
   }
   if (hit && hit !== mouseHovered) {
     mouseHovered = hit;
-    if (hit.material && hit.material.emissive) {
-      hit.material.emissive.setHex(hit.userData.isReset ? 0x0077aa : 0x00e5ff);
-    }
+    setEmissive(hit, hit.userData.isReset ? 0x0077aa : 0x00e5ff, 1.0);
   }
 });
 
@@ -1573,20 +1548,20 @@ renderer.domElement.addEventListener('click', (e) => {
   if (hit && hit.userData.isPart) {
     if (!selectedPartForSwap) {
       selectedPartForSwap = hit;
-      selectedPartForSwap.material.emissive.setHex(0x38bdf8);
+      setEmissive(selectedPartForSwap, 0x38bdf8, 1.0);
     } else if (selectedPartForSwap === hit) {
-      selectedPartForSwap.material.emissive.setHex(0x000000);
+      setEmissive(selectedPartForSwap, 0x000000, 0);
       selectedPartForSwap = null;
     } else {
       // Swap clicked parts
       swapSlots(selectedPartForSwap.userData.currentSlot, hit.userData.currentSlot);
-      selectedPartForSwap.material.emissive.setHex(0x000000);
+      setEmissive(selectedPartForSwap, 0x000000, 0);
       selectedPartForSwap = null;
     }
   } else if (hit && hit.userData.slotIndex !== undefined && selectedPartForSwap) {
     // Clicked a slot while holding a selected part
     swapSlots(selectedPartForSwap.userData.currentSlot, hit.userData.slotIndex);
-    selectedPartForSwap.material.emissive.setHex(0x000000);
+    setEmissive(selectedPartForSwap, 0x000000, 0);
     selectedPartForSwap = null;
   }
 });
