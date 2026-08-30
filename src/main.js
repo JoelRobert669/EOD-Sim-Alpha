@@ -901,13 +901,14 @@ function updateMannequinReflection() {
   updateHUD(correctCount);
 }
 
-// Initial Shuffle & Materialization
-shuffleAndAssign();
-
 // --- Drag & Drop / Swapping State ---
 let grabbedItem = null;
 let grabController = null;
 let hoveredSlotIndex = -1;
+let grabbedUI = null;
+let uiGrabController = null;
+let uiGrabDist = 1.6;
+let isDraggingUI = false;
 
 const raycaster = new THREE.Raycaster();
 const controllers = [];
@@ -985,7 +986,7 @@ function pickFromRay(origin, direction) {
   raycaster.ray.origin.copy(origin);
   raycaster.ray.direction.copy(direction);
 
-  const targets = [...allPartMeshes, ...slotPads, resetBtn];
+  const targets = [...allPartMeshes, ...slotPads, resetBtn, hud];
   const hits = raycaster.intersectObjects(targets, false);
   return hits.length ? hits[0] : null;
 }
@@ -1007,7 +1008,7 @@ function pick(controller) {
     if (controller.userData.line) {
       controller.userData.line.scale.z = hitData.distance / 5;
     }
-    return hitData.object;
+    return hitData;
   } else {
     if (controller.userData.reticle) {
       controller.userData.reticle.position.z = -5;
@@ -1060,11 +1061,19 @@ function swapSlots(sourceSlotIdx, targetSlotIdx) {
 }
 
 function onVRSelectStart(controller) {
-  const hit = pick(controller);
-  if (!hit) return;
+  const hitData = pick(controller);
+  if (!hitData) return;
+  const hit = hitData.object;
 
   if (hit === resetBtn) {
     shuffleAndAssign();
+    return;
+  }
+
+  if (hit === hud) {
+    grabbedUI = hud;
+    uiGrabController = controller;
+    uiGrabDist = Math.max(0.6, hitData.distance);
     return;
   }
 
@@ -1078,6 +1087,11 @@ function onVRSelectStart(controller) {
 }
 
 function onVRSelectEnd(controller) {
+  if (grabbedUI && uiGrabController === controller) {
+    grabbedUI = null;
+    uiGrabController = null;
+  }
+
   if (grabbedItem && grabController === controller) {
     // Drop logic
     const { index: closestSlot, distance } = findClosestSlot(grabbedItem.position);
@@ -1252,6 +1266,15 @@ function animate() {
 
   // In VR, update grabbed item position along controller ray
   if (renderer.xr.isPresenting) {
+    if (grabbedUI && uiGrabController) {
+      const rayOrigin = uiGrabController.getWorldPosition(new THREE.Vector3());
+      const rayDir = new THREE.Vector3(0, 0, -1).applyQuaternion(
+        uiGrabController.getWorldQuaternion(new THREE.Quaternion())
+      );
+      grabbedUI.position.copy(rayOrigin).addScaledVector(rayDir, uiGrabDist);
+      grabbedUI.lookAt(camera.getWorldPosition(new THREE.Vector3()));
+    }
+
     if (grabbedItem && grabController) {
       const rayOrigin = grabController.getWorldPosition(new THREE.Vector3());
       const rayDir = new THREE.Vector3(0, 0, -1).applyQuaternion(
@@ -1266,7 +1289,8 @@ function animate() {
     }
 
     for (const controller of controllers) {
-      const hit = pick(controller);
+      const hitData = pick(controller);
+      const hit = hitData ? hitData.object : null;
       const prev = controller.userData.hovered;
       if (prev && prev !== hit) {
         if (prev.material && prev.material.emissive && !prev.userData.isGrabbed) {
@@ -1340,7 +1364,11 @@ renderer.domElement.addEventListener('pointerdown', (e) => {
   const hitData = pickFromRay(raycaster.ray.origin, raycaster.ray.direction);
   const hit = hitData ? hitData.object : null;
 
-  if (hit && hit.userData.isPart) {
+  if (hit === resetBtn) {
+    shuffleAndAssign();
+  } else if (hit === hud) {
+    isDraggingUI = true;
+  } else if (hit && hit.userData.isPart) {
     // Start dragging part
     grabbedItem = hit;
     isDraggingPart = true;
@@ -1355,6 +1383,10 @@ renderer.domElement.addEventListener('pointerdown', (e) => {
 
 addEventListener('pointerup', (e) => {
   if (renderer.xr.isPresenting) return;
+
+  if (isDraggingUI) {
+    isDraggingUI = false;
+  }
 
   if (isDraggingPart && grabbedItem) {
     const { index: closestSlot, distance } = findClosestSlot(grabbedItem.position);
@@ -1379,8 +1411,20 @@ renderer.domElement.addEventListener('pointermove', (e) => {
   if (renderer.xr.isPresenting) return;
   updateMouseRay(e);
 
+  if (isDraggingUI) {
+    const panelNormal = new THREE.Vector3().subVectors(camera.position, hud.position).normalize();
+    dragPlane.setFromNormalAndCoplanarPoint(panelNormal, hud.position);
+    const panelPoint = new THREE.Vector3();
+    if (raycaster.ray.intersectPlane(dragPlane, panelPoint)) {
+      hud.position.copy(panelPoint);
+      hud.lookAt(camera.position);
+    }
+    return;
+  }
+
   if (isDraggingPart && grabbedItem) {
     const intersectPoint = new THREE.Vector3();
+    dragPlane.setFromNormalAndCoplanarPoint(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, gridOrigin.y + 0.08, 0));
     raycaster.ray.intersectPlane(dragPlane, intersectPoint);
     if (intersectPoint) {
       grabbedItem.position.copy(intersectPoint);
