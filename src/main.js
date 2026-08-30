@@ -491,57 +491,59 @@ function drawVisionOSGlass(ctx, x, y, w, h, r, options = {}) {
 
 function createSlotPadTexture(label, isCorrect = false, isHovered = false) {
   const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 384;
+  canvas.width = 1024;
+  canvas.height = 768;
   const ctx = canvas.getContext('2d');
 
-  let bgOpacity = 0.45;
-  let borderColor = 'rgba(255, 255, 255, 0.15)';
-  let textColor = '#f8fafc';
-  let subtitleColor = '#64748b';
+  let bgOpacity = 0.50;
+  let borderColor = 'rgba(255, 255, 255, 0.18)';
+  let textColor = '#ffffff';
+  let subtitleColor = '#94a3b8';
   let subtitleText = 'DRAG HERE';
 
   if (isCorrect) {
-    bgOpacity = 0.55;
-    borderColor = 'rgba(16, 185, 129, 0.7)';
+    bgOpacity = 0.62;
+    borderColor = 'rgba(16, 185, 129, 0.85)';
     textColor = '#34d399';
     subtitleColor = '#34d399';
     subtitleText = '✓ VERIFIED';
-    ctx.fillStyle = 'rgba(16, 185, 129, 0.08)';
-    drawRoundedRect(ctx, 16, 16, 480, 352, 28);
+    ctx.fillStyle = 'rgba(16, 185, 129, 0.12)';
+    drawRoundedRect(ctx, 24, 24, 976, 720, 48);
     ctx.fill();
   } else if (isHovered) {
-    bgOpacity = 0.60;
-    borderColor = 'rgba(56, 189, 248, 0.75)';
+    bgOpacity = 0.68;
+    borderColor = 'rgba(56, 189, 248, 0.9)';
     textColor = '#38bdf8';
     subtitleColor = '#38bdf8';
     subtitleText = 'RELEASE TO DROP';
-    ctx.fillStyle = 'rgba(56, 189, 248, 0.12)';
-    drawRoundedRect(ctx, 16, 16, 480, 352, 28);
+    ctx.fillStyle = 'rgba(56, 189, 248, 0.16)';
+    drawRoundedRect(ctx, 24, 24, 976, 720, 48);
     ctx.fill();
   }
 
   // VisionOS Smoked Glass Pad Base
-  drawVisionOSGlass(ctx, 16, 16, 480, 352, 28, {
+  drawVisionOSGlass(ctx, 24, 24, 976, 720, 48, {
     bgAlpha: bgOpacity,
-    borderAlpha: isHovered || isCorrect ? 0.65 : 0.22,
+    borderAlpha: isHovered || isCorrect ? 0.8 : 0.3,
     shadow: false,
   });
 
-  // Etched Slot Label (Apple SF Pro style typography)
+  // Etched Slot Label (Modern Bold Geometric Typography)
   ctx.fillStyle = textColor;
-  ctx.font = 'bold 54px -apple-system, system-ui, BlinkMacSystemFont, sans-serif';
+  ctx.font = '900 100px "Space Grotesk", "Plus Jakarta Sans", -apple-system, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(`SLOT ${label}`, 256, 150);
+  ctx.fillText(`SLOT ${label}`, 512, 300);
 
   // Subtitle
   ctx.fillStyle = subtitleColor;
-  ctx.font = '600 32px -apple-system, system-ui, BlinkMacSystemFont, sans-serif';
-  ctx.fillText(subtitleText, 256, 250);
+  ctx.font = '800 64px "Plus Jakarta Sans", "Inter", -apple-system, sans-serif';
+  ctx.fillText(subtitleText, 512, 490);
 
   const texture = new THREE.CanvasTexture(canvas);
-  texture.minFilter = THREE.LinearFilter;
+  texture.generateMipmaps = true;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.anisotropy = 8;
   return texture;
 }
 
@@ -568,45 +570,48 @@ for (let i = 0; i < SLOT_POSITIONS.length; i++) {
 const labels = [];
 function createBadge(text, stepNum) {
   const canvas = document.createElement('canvas');
-  canvas.width = 600;
-  canvas.height = 140;
+  canvas.width = 1024;
+  canvas.height = 240;
   const ctx = canvas.getContext('2d');
 
   // Outer Smoked Glass Capsule
-  drawVisionOSGlass(ctx, 6, 6, 588, 128, 36, { bgAlpha: 0.75, borderAlpha: 0.35, shadow: true });
+  drawVisionOSGlass(ctx, 10, 10, 1004, 220, 60, { bgAlpha: 0.82, borderAlpha: 0.45, shadow: true });
 
   // Left Sequence Number Pill
-  const numPillWidth = 100;
-  const numGrad = ctx.createLinearGradient(16, 16, 16, 124);
-  numGrad.addColorStop(0, 'rgba(30, 41, 59, 0.95)');
-  numGrad.addColorStop(1, 'rgba(15, 23, 42, 0.98)');
+  const numPillWidth = 170;
+  const numGrad = ctx.createLinearGradient(24, 24, 24, 216);
+  numGrad.addColorStop(0, 'rgba(30, 41, 59, 0.98)');
+  numGrad.addColorStop(1, 'rgba(15, 23, 42, 1.0)');
   ctx.fillStyle = numGrad;
-  drawRoundedRect(ctx, 16, 16, numPillWidth, 108, 28);
+  drawRoundedRect(ctx, 24, 24, numPillWidth, 192, 48);
   ctx.fill();
 
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-  ctx.lineWidth = 2;
-  drawRoundedRect(ctx, 16, 16, numPillWidth, 108, 28);
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+  ctx.lineWidth = 3;
+  drawRoundedRect(ctx, 24, 24, numPillWidth, 192, 48);
   ctx.stroke();
 
   // Number String (e.g. 01, 02)
   const stepStr = String(stepNum).padStart(2, '0');
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 44px -apple-system, system-ui, BlinkMacSystemFont, sans-serif';
+  ctx.fillStyle = '#38bdf8';
+  ctx.font = '900 78px "Space Grotesk", "Plus Jakarta Sans", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(stepStr, 16 + numPillWidth / 2, 70);
+  ctx.fillText(stepStr, 24 + numPillWidth / 2, 120);
 
   // Component Name String
-  ctx.fillStyle = '#f8fafc';
-  ctx.font = '600 34px -apple-system, system-ui, BlinkMacSystemFont, sans-serif';
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '800 58px "Plus Jakarta Sans", "Inter", -apple-system, sans-serif';
   ctx.textAlign = 'left';
-  ctx.fillText(text, 136, 70);
+  ctx.fillText(text, 225, 120);
 
   const texture = new THREE.CanvasTexture(canvas);
-  texture.minFilter = THREE.LinearFilter;
+  texture.generateMipmaps = true;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.anisotropy = 8;
+
   const plane = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.24, 0.056),
+    new THREE.PlaneGeometry(0.28, 0.066),
     new THREE.MeshBasicMaterial({
       map: texture,
       transparent: true,
@@ -834,76 +839,63 @@ function getSlotWorldPosition(slotIndex, halfH = 0.04) {
 // --- Apple VisionOS Spatial UI Setup ---
 // 1. Main Objective Panel (Floating Upper-Left)
 const objCanvas = document.createElement('canvas');
-objCanvas.width = 1280;
-objCanvas.height = 1080;
+objCanvas.width = 2048;
+objCanvas.height = 1600;
 const objCtx = objCanvas.getContext('2d');
 const objTexture = new THREE.CanvasTexture(objCanvas);
-objTexture.minFilter = THREE.LinearFilter;
+objTexture.generateMipmaps = true;
+objTexture.minFilter = THREE.LinearMipmapLinearFilter;
+objTexture.anisotropy = 8;
 
 const objectivePanel = new THREE.Mesh(
-  new THREE.PlaneGeometry(0.74, 0.62),
+  new THREE.PlaneGeometry(0.86, 0.67),
   new THREE.MeshBasicMaterial({ map: objTexture, transparent: true, depthWrite: false })
 );
-objectivePanel.position.set(-0.78, 1.48, -1.35);
-objectivePanel.rotation.set(-0.04, 0.24, 0);
+objectivePanel.position.set(-0.80, 1.48, -1.30);
+objectivePanel.rotation.set(-0.04, 0.26, 0);
 objectivePanel.userData.isUI = true;
 scene.add(objectivePanel);
 
 // Side chevron navigation handle on Objective panel
-const navPillGeo = new THREE.RingGeometry(0.024, 0.032, 32);
+const navPillGeo = new THREE.RingGeometry(0.028, 0.038, 32);
 const navPillMat = new THREE.MeshBasicMaterial({
   color: 0x38bdf8,
   transparent: true,
-  opacity: 0.7,
+  opacity: 0.75,
   side: THREE.DoubleSide,
   depthWrite: false,
 });
 const navPill = new THREE.Mesh(navPillGeo, navPillMat);
-navPill.position.set(0.38, 0.05, 0.01);
+navPill.position.set(0.44, 0.05, 0.01);
 objectivePanel.add(navPill);
 
 // 2. Sequencing Progress Card (Floating Upper-Right)
 const progCanvas = document.createElement('canvas');
-progCanvas.width = 1000;
-progCanvas.height = 600;
+progCanvas.width = 1600;
+progCanvas.height = 960;
 const progCtx = progCanvas.getContext('2d');
 const progTexture = new THREE.CanvasTexture(progCanvas);
-progTexture.minFilter = THREE.LinearFilter;
+progTexture.generateMipmaps = true;
+progTexture.minFilter = THREE.LinearMipmapLinearFilter;
+progTexture.anisotropy = 8;
 
 const progressPanel = new THREE.Mesh(
-  new THREE.PlaneGeometry(0.50, 0.30),
+  new THREE.PlaneGeometry(0.60, 0.36),
   new THREE.MeshBasicMaterial({ map: progTexture, transparent: true, depthWrite: false })
 );
-progressPanel.position.set(0.72, 1.58, -1.35);
-progressPanel.rotation.set(-0.04, -0.24, 0);
+progressPanel.position.set(0.76, 1.50, -1.30);
+progressPanel.rotation.set(-0.04, -0.26, 0);
 progressPanel.userData.isUI = true;
 scene.add(progressPanel);
 
 // Shuffle Action Button inside Progress Card
 const shuffleBtn = new THREE.Mesh(
-  new THREE.PlaneGeometry(0.26, 0.075),
+  new THREE.PlaneGeometry(0.32, 0.09),
   new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })
 );
-shuffleBtn.position.set(0, -0.065, 0.01);
+shuffleBtn.position.set(0, -0.075, 0.01);
 shuffleBtn.userData.isReset = true;
 progressPanel.add(shuffleBtn);
-
-// 3. Floating Utility Control Capsule (Upper-Right Lower)
-const utilCanvas = document.createElement('canvas');
-utilCanvas.width = 960;
-utilCanvas.height = 320;
-const utilCtx = utilCanvas.getContext('2d');
-const utilTexture = new THREE.CanvasTexture(utilCanvas);
-utilTexture.minFilter = THREE.LinearFilter;
-
-const utilityPanel = new THREE.Mesh(
-  new THREE.PlaneGeometry(0.48, 0.16),
-  new THREE.MeshBasicMaterial({ map: utilTexture, transparent: true, depthWrite: false })
-);
-utilityPanel.position.set(0.72, 1.34, -1.35);
-utilityPanel.rotation.set(-0.04, -0.24, 0);
-utilityPanel.userData.isUI = true;
-scene.add(utilityPanel);
 
 // Unified references for legacy event handling
 const hud = objectivePanel;
@@ -912,154 +904,131 @@ const resetBtn = shuffleBtn;
 let gameState = 'playing';
 
 function updateHUD(correctCount = 0) {
-  // 1. RENDER OBJECTIVE PANEL
-  objCtx.clearRect(0, 0, 1280, 1080);
-  drawVisionOSGlass(objCtx, 20, 20, 1240, 1040, 44, { bgAlpha: 0.65, borderAlpha: 0.32, shadow: true });
+  // 1. RENDER OBJECTIVE PANEL (High-Density Ultra-Crisp Canvas)
+  objCtx.clearRect(0, 0, 2048, 1600);
+  drawVisionOSGlass(objCtx, 24, 24, 2000, 1552, 64, { bgAlpha: 0.70, borderAlpha: 0.40, shadow: true });
 
   // Header status pill
   objCtx.beginPath();
-  objCtx.arc(76, 84, 8, 0, Math.PI * 2);
-  objCtx.fillStyle = '#00e5ff';
-  objCtx.shadowColor = '#00e5ff';
-  objCtx.shadowBlur = 12;
+  objCtx.arc(110, 120, 12, 0, Math.PI * 2);
+  objCtx.fillStyle = '#00f0ff';
+  objCtx.shadowColor = '#00f0ff';
+  objCtx.shadowBlur = 16;
   objCtx.fill();
   objCtx.shadowBlur = 0;
 
-  objCtx.fillStyle = '#94a3b8';
-  objCtx.font = 'bold 24px -apple-system, system-ui, BlinkMacSystemFont, sans-serif';
+  objCtx.fillStyle = '#38bdf8';
+  objCtx.font = '800 38px "Plus Jakarta Sans", "Inter", sans-serif';
   objCtx.textAlign = 'left';
-  objCtx.fillText('OBJECTIVE', 98, 92);
+  objCtx.fillText('OBJECTIVE', 140, 132);
 
   // Large Bold Title
   objCtx.fillStyle = '#ffffff';
-  objCtx.font = 'bold 60px -apple-system, system-ui, BlinkMacSystemFont, sans-serif';
-  objCtx.fillText('Sort Components into', 76, 185);
-  objCtx.fillText('SOP Order (1 → 11)', 76, 260);
+  objCtx.font = '800 88px "Plus Jakarta Sans", "Inter", -apple-system, sans-serif';
+  objCtx.fillText('Sort Components into', 110, 265);
+  objCtx.fillText('SOP Order (1 → 11)', 110, 375);
 
   // Secondary Instructional text
-  objCtx.fillStyle = '#94a3b8';
-  objCtx.font = '500 28px -apple-system, system-ui, BlinkMacSystemFont, sans-serif';
-  objCtx.fillText('Drag & drop parts between holographic slots.', 76, 345);
-  objCtx.fillText('Correct placement snaps the component.', 76, 390);
+  objCtx.fillStyle = '#cbd5e1';
+  objCtx.font = '600 44px "Inter", "Plus Jakarta Sans", sans-serif';
+  objCtx.fillText('Drag & drop parts between holographic slots.', 110, 500);
+  objCtx.fillText('Correct placement snaps the component.', 110, 565);
 
   // Hairline divider
   objCtx.beginPath();
-  objCtx.moveTo(76, 450);
-  objCtx.lineTo(1204, 450);
-  objCtx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
-  objCtx.lineWidth = 2;
+  objCtx.moveTo(110, 650);
+  objCtx.lineTo(1938, 650);
+  objCtx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+  objCtx.lineWidth = 3;
   objCtx.stroke();
 
   // Bottom Counter Metric
   objCtx.beginPath();
-  objCtx.arc(104, 550, 22, 0, Math.PI * 2);
-  objCtx.strokeStyle = 'rgba(56, 189, 248, 0.7)';
-  objCtx.lineWidth = 3;
+  objCtx.arc(155, 800, 34, 0, Math.PI * 2);
+  objCtx.strokeStyle = '#38bdf8';
+  objCtx.lineWidth = 4.5;
   objCtx.stroke();
   objCtx.beginPath();
-  objCtx.moveTo(104, 536);
-  objCtx.lineTo(104, 550);
-  objCtx.lineTo(114, 550);
+  objCtx.moveTo(155, 780);
+  objCtx.lineTo(155, 800);
+  objCtx.lineTo(170, 800);
   objCtx.strokeStyle = '#38bdf8';
-  objCtx.lineWidth = 2.5;
+  objCtx.lineWidth = 4;
   objCtx.stroke();
 
   objCtx.fillStyle = '#ffffff';
-  objCtx.font = 'bold 54px -apple-system, system-ui, BlinkMacSystemFont, sans-serif';
-  objCtx.fillText(`${correctCount} / 11`, 144, 568);
+  objCtx.font = '900 96px "Space Grotesk", "Plus Jakarta Sans", sans-serif';
+  objCtx.fillText(`${correctCount} / 11`, 215, 825);
 
   objCtx.fillStyle = '#94a3b8';
-  objCtx.font = '500 30px -apple-system, system-ui, BlinkMacSystemFont, sans-serif';
-  objCtx.fillText('Components placed', 340, 568);
+  objCtx.font = '700 48px "Plus Jakarta Sans", sans-serif';
+  objCtx.fillText('Components placed', 560, 825);
 
   // Abstract Blue Wave Graphic at bottom
-  const waveY = 880;
+  const waveY = 1320;
   for (let w = 0; w < 3; w++) {
     objCtx.beginPath();
-    objCtx.moveTo(60, waveY + w * 20);
-    for (let x = 60; x <= 1220; x += 40) {
-      const y = waveY + Math.sin((x * 0.008) + w * 1.5) * 45 + Math.cos(x * 0.004) * 20;
+    objCtx.moveTo(100, waveY + w * 28);
+    for (let x = 100; x <= 1948; x += 60) {
+      const y = waveY + Math.sin((x * 0.005) + w * 1.5) * 65 + Math.cos(x * 0.003) * 30;
       objCtx.lineTo(x, y);
     }
-    objCtx.strokeStyle = `rgba(56, 189, 248, ${0.15 + w * 0.08})`;
-    objCtx.lineWidth = 2.5;
+    objCtx.strokeStyle = `rgba(56, 189, 248, ${0.18 + w * 0.1})`;
+    objCtx.lineWidth = 3.5;
     objCtx.stroke();
   }
   objTexture.needsUpdate = true;
 
-  // 2. RENDER PROGRESS PANEL
-  progCtx.clearRect(0, 0, 1000, 600);
-  drawVisionOSGlass(progCtx, 20, 20, 960, 560, 40, { bgAlpha: 0.68, borderAlpha: 0.32, shadow: true });
+  // 2. RENDER PROGRESS PANEL (High-Density Canvas)
+  progCtx.clearRect(0, 0, 1600, 960);
+  drawVisionOSGlass(progCtx, 24, 24, 1552, 912, 56, { bgAlpha: 0.72, borderAlpha: 0.40, shadow: true });
 
   // Progress Header
   progCtx.beginPath();
-  progCtx.arc(66, 76, 7, 0, Math.PI * 2);
-  progCtx.fillStyle = '#00e5ff';
-  progCtx.shadowColor = '#00e5ff';
-  progCtx.shadowBlur = 10;
+  progCtx.arc(90, 100, 10, 0, Math.PI * 2);
+  progCtx.fillStyle = '#00f0ff';
+  progCtx.shadowColor = '#00f0ff';
+  progCtx.shadowBlur = 14;
   progCtx.fill();
   progCtx.shadowBlur = 0;
 
-  progCtx.fillStyle = '#94a3b8';
-  progCtx.font = 'bold 22px -apple-system, system-ui, BlinkMacSystemFont, sans-serif';
+  progCtx.fillStyle = '#38bdf8';
+  progCtx.font = '800 36px "Plus Jakarta Sans", "Inter", sans-serif';
   progCtx.textAlign = 'left';
-  progCtx.fillText('SEQUENCING PROGRESS', 86, 84);
+  progCtx.fillText('SEQUENCING PROGRESS', 118, 112);
 
-  // 11 Progress Segment Pills
-  const segW = 68;
-  const segH = 14;
-  const segGap = 12;
-  const startX = 60;
+  // 11 Segmented Progress Pills (Large & High Contrast)
+  const segW = 112;
+  const segH = 24;
+  const segGap = 18;
+  const startX = 90;
   for (let i = 0; i < PARTS.length; i++) {
     const px = startX + i * (segW + segGap);
     const isSlotCorrect = slotOccupants[i] && slotOccupants[i].userData.part.targetSlot === i;
-    progCtx.fillStyle = isSlotCorrect ? '#00e5ff' : 'rgba(51, 65, 85, 0.5)';
+    progCtx.fillStyle = isSlotCorrect ? '#00f0ff' : 'rgba(71, 85, 105, 0.65)';
     if (isSlotCorrect) {
-      progCtx.shadowColor = '#00e5ff';
-      progCtx.shadowBlur = 8;
+      progCtx.shadowColor = '#00f0ff';
+      progCtx.shadowBlur = 12;
     }
-    drawRoundedRect(progCtx, px, 140, segW, segH, 7);
+    drawRoundedRect(progCtx, px, 210, segW, segH, 12);
     progCtx.fill();
     progCtx.shadowBlur = 0;
   }
 
   // Large Pill-Shaped SHUFFLE Button
-  const btnX = 260;
-  const btnY = 360;
-  const btnW = 480;
-  const btnH = 120;
-  drawVisionOSGlass(progCtx, btnX, btnY, btnW, btnH, 60, { bgAlpha: 0.8, borderAlpha: 0.35, shadow: true });
+  const btnX = 420;
+  const btnY = 560;
+  const btnW = 760;
+  const btnH = 180;
+  drawVisionOSGlass(progCtx, btnX, btnY, btnW, btnH, 90, { bgAlpha: 0.85, borderAlpha: 0.50, shadow: true });
 
   // Shuffle Icon & Text
   progCtx.fillStyle = '#ffffff';
-  progCtx.font = 'bold 44px -apple-system, system-ui, BlinkMacSystemFont, sans-serif';
+  progCtx.font = '800 68px "Plus Jakarta Sans", "Inter", -apple-system, sans-serif';
   progCtx.textAlign = 'center';
   progCtx.textBaseline = 'middle';
   progCtx.fillText('↝  SHUFFLE', btnX + btnW / 2, btnY + btnH / 2);
   progTexture.needsUpdate = true;
-
-  // 3. RENDER FLOATING UTILITY CONTROLS
-  utilCtx.clearRect(0, 0, 960, 320);
-  drawVisionOSGlass(utilCtx, 16, 16, 928, 288, 36, { bgAlpha: 0.68, borderAlpha: 0.32, shadow: true });
-
-  const controls = [
-    { icon: '↺', label: 'RESET', x: 160 },
-    { icon: '💡', label: 'HINT', x: 480 },
-    { icon: 'ⓘ', label: 'INFO', x: 800 },
-  ];
-
-  for (const c of controls) {
-    utilCtx.fillStyle = '#ffffff';
-    utilCtx.font = '36px -apple-system, system-ui, BlinkMacSystemFont, sans-serif';
-    utilCtx.textAlign = 'center';
-    utilCtx.textBaseline = 'middle';
-    utilCtx.fillText(c.icon, c.x, 110);
-
-    utilCtx.font = 'bold 22px -apple-system, system-ui, BlinkMacSystemFont, sans-serif';
-    utilCtx.fillStyle = '#94a3b8';
-    utilCtx.fillText(c.label, c.x, 190);
-  }
-  utilTexture.needsUpdate = true;
 }
 
 // --- Shuffling, Jumbling, and Holographic Forming Animation ---
@@ -1298,7 +1267,6 @@ function pickFromRay(origin, direction) {
     shuffleBtn,
     objectivePanel,
     progressPanel,
-    utilityPanel,
     mannequinRotateRing,
     mannequinCollider,
     mannequinRing,
@@ -1382,11 +1350,6 @@ function onVRSelectStart(controller) {
   const hit = hitData.object;
 
   if (hit === shuffleBtn || hit?.userData?.isReset) {
-    shuffleAndAssign();
-    return;
-  }
-
-  if (hit === utilityPanel) {
     shuffleAndAssign();
     return;
   }
@@ -1790,8 +1753,6 @@ renderer.domElement.addEventListener('pointerdown', (e) => {
   } else if (hit === progressPanel) {
     // If clicked on lower region of progress panel (shuffle button)
     shuffleAndAssign();
-  } else if (hit === utilityPanel) {
-    shuffleAndAssign();
   } else if (hit === objectivePanel) {
     isDraggingUI = true;
     grabbedUI = objectivePanel;
@@ -1935,7 +1896,7 @@ renderer.domElement.addEventListener('click', (e) => {
   const hitData = pickFromRay(raycaster.ray.origin, raycaster.ray.direction);
   const hit = hitData ? hitData.object : null;
 
-  if (hit === shuffleBtn || hit === resetBtn || hit === progressPanel || hit === utilityPanel || hit?.userData?.isReset) {
+  if (hit === shuffleBtn || hit === resetBtn || hit === progressPanel || hit?.userData?.isReset) {
     shuffleAndAssign();
     return;
   }
