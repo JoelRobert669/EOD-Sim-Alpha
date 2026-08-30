@@ -72,6 +72,60 @@ mannequin.position.set(0, 0, -1.9);
 mannequin.rotation.y = 0; // Front of Blender mannequin faces forward towards player
 scene.add(mannequin);
 
+// Ground Contact Soft Shadow Texture
+function createGroundShadowTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  const grad = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+  grad.addColorStop(0, 'rgba(0, 0, 0, 0.85)');
+  grad.addColorStop(0.35, 'rgba(0, 0, 0, 0.55)');
+  grad.addColorStop(0.65, 'rgba(0, 0, 0, 0.18)');
+  grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 256, 256);
+  const texture = new THREE.CanvasTexture(canvas);
+  return texture;
+}
+
+const shadowGeo = new THREE.PlaneGeometry(1.4, 1.4);
+const shadowMat = new THREE.MeshBasicMaterial({
+  map: createGroundShadowTexture(),
+  transparent: true,
+  opacity: 0.8,
+  depthWrite: false,
+});
+const mannequinShadow = new THREE.Mesh(shadowGeo, shadowMat);
+mannequinShadow.rotation.x = -Math.PI / 2;
+mannequinShadow.position.y = 0.002;
+mannequinShadow.userData.isMannequin = true;
+mannequin.add(mannequinShadow);
+
+// Cyber Base Ring under Mannequin for grasping & visual anchor
+const ringGeo = new THREE.RingGeometry(0.38, 0.42, 48);
+const ringMat = new THREE.MeshBasicMaterial({
+  color: 0x00e5ff,
+  transparent: true,
+  opacity: 0.7,
+  side: THREE.DoubleSide,
+  depthWrite: false,
+});
+const mannequinRing = new THREE.Mesh(ringGeo, ringMat);
+mannequinRing.rotation.x = -Math.PI / 2;
+mannequinRing.position.y = 0.004;
+mannequinRing.userData.isMannequin = true;
+mannequin.add(mannequinRing);
+
+// Mannequin invisible interaction collider cylinder (height 1.85m, radius 0.42m)
+const mannequinCollider = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.42, 0.45, 1.85, 16),
+  new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })
+);
+mannequinCollider.position.y = 0.925;
+mannequinCollider.userData.isMannequin = true;
+mannequin.add(mannequinCollider);
+
 function makeShape(part) {
   switch (part.shape) {
     case 'box':
@@ -344,6 +398,49 @@ function initFormingParticles() {
   formGeo.attributes.position.needsUpdate = true;
 }
 
+// --- Holographic Equipment Particle Burst FX (When new part equips onto body) ---
+const NUM_EQUIP_PARTICLES = 60;
+const equipPositions = new Float32Array(NUM_EQUIP_PARTICLES * 3);
+const equipVelocities = new Float32Array(NUM_EQUIP_PARTICLES * 3);
+for (let i = 0; i < NUM_EQUIP_PARTICLES; i++) {
+  equipPositions[i * 3 + 1] = -100;
+}
+const equipGeo = new THREE.BufferGeometry();
+equipGeo.setAttribute('position', new THREE.BufferAttribute(equipPositions, 3));
+const equipMat = new THREE.PointsMaterial({
+  color: 0x00ffff,
+  size: 0.045,
+  map: particleTexture,
+  transparent: true,
+  opacity: 0,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+});
+const equipParticleSystem = new THREE.Points(equipGeo, equipMat);
+scene.add(equipParticleSystem);
+
+let isEquipFxActive = false;
+let equipFxTimer = 0;
+const EQUIP_FX_DURATION = 0.8;
+
+function triggerEquipFX(worldPos) {
+  isEquipFxActive = true;
+  equipFxTimer = 0;
+  equipMat.opacity = 1.0;
+  for (let i = 0; i < NUM_EQUIP_PARTICLES; i++) {
+    equipPositions[i * 3 + 0] = worldPos.x + (Math.random() - 0.5) * 0.16;
+    equipPositions[i * 3 + 1] = worldPos.y + (Math.random() - 0.5) * 0.16;
+    equipPositions[i * 3 + 2] = worldPos.z + (Math.random() - 0.5) * 0.16;
+
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 0.25 + Math.random() * 0.45;
+    equipVelocities[i * 3 + 0] = Math.cos(angle) * speed;
+    equipVelocities[i * 3 + 1] = 0.15 + Math.random() * 0.5; // upward burst
+    equipVelocities[i * 3 + 2] = Math.sin(angle) * speed;
+  }
+  equipGeo.attributes.position.needsUpdate = true;
+}
+
 // --- Transparent Holographic Slot Pads (Grid passes cleanly through!) ---
 function drawRoundedRect(ctx, x, y, w, h, r) {
   ctx.beginPath();
@@ -494,6 +591,7 @@ function createBadge(text, stepNum) {
       side: THREE.DoubleSide,
     })
   );
+  plane.visible = false; // Hidden by default, shown only when hovered/pointed at!
   labels.push(plane);
   return plane;
 }
@@ -965,6 +1063,8 @@ function shuffleAndAssign() {
   triggerFormingAnimation();
 }
 
+const equippedState = new Map();
+
 function updateMannequinReflection() {
   let correctCount = 0;
 
@@ -980,15 +1080,23 @@ function updateMannequinReflection() {
 
     if (isCorrect) {
       correctCount++;
-      const clone = mannequinClones.get(mesh.userData.part.id);
-      if (clone) clone.visible = true;
-      if (mesh.userData.label) {
-        mesh.userData.label.visible = true;
+      const partId = mesh.userData.part.id;
+      const clone = mannequinClones.get(partId);
+      if (clone) {
+        if (!equippedState.get(partId) && !isForming) {
+          const worldPos = new THREE.Vector3();
+          clone.getWorldPosition(worldPos);
+          triggerEquipFX(worldPos);
+        }
+        clone.visible = true;
       }
+      equippedState.set(partId, true);
     } else {
       if (mesh) {
-        const clone = mannequinClones.get(mesh.userData.part.id);
+        const partId = mesh.userData.part.id;
+        const clone = mannequinClones.get(partId);
         if (clone) clone.visible = false;
+        equippedState.set(partId, false);
       }
     }
   }
@@ -999,6 +1107,7 @@ function updateMannequinReflection() {
     if (!mesh || mesh.userData.currentSlot !== part.targetSlot) {
       const clone = mannequinClones.get(part.id);
       if (clone) clone.visible = false;
+      equippedState.set(part.id, false);
     }
   }
 
@@ -1020,6 +1129,10 @@ let grabbedUI = null;
 let uiGrabController = null;
 let uiGrabDist = 1.6;
 let isDraggingUI = false;
+
+let isDraggingMannequin = false;
+let mannequinGrabController = null;
+let mannequinGrabDist = 2.0;
 
 const raycaster = new THREE.Raycaster();
 const controllers = [];
@@ -1097,7 +1210,15 @@ function pickFromRay(origin, direction) {
   raycaster.ray.origin.copy(origin);
   raycaster.ray.direction.copy(direction);
 
-  const targets = [...allPartMeshes, ...slotPads, resetBtn, hud];
+  const targets = [
+    ...allPartMeshes,
+    ...slotPads,
+    resetBtn,
+    hud,
+    mannequinCollider,
+    mannequinRing,
+    mannequinShadow,
+  ];
   const hits = raycaster.intersectObjects(targets, false);
   return hits.length ? hits[0] : null;
 }
@@ -1156,7 +1277,6 @@ function swapSlots(sourceSlotIdx, targetSlotIdx) {
   if (!itemA) return;
 
   if (itemB) {
-    // Two-item swap
     slotOccupants[sourceSlotIdx] = itemB;
     itemB.userData.currentSlot = sourceSlotIdx;
     itemB.userData.targetPos.copy(getSlotWorldPosition(sourceSlotIdx, itemB.userData.halfH));
@@ -1188,6 +1308,18 @@ function onVRSelectStart(controller) {
     return;
   }
 
+  if (
+    hit === mannequinCollider ||
+    hit === mannequinRing ||
+    hit === mannequinShadow ||
+    hit.userData?.isMannequin
+  ) {
+    isDraggingMannequin = true;
+    mannequinGrabController = controller;
+    mannequinGrabDist = Math.max(0.8, hitData.distance);
+    return;
+  }
+
   // If grabbed a part mesh
   if (hit.userData && hit.userData.isPart) {
     grabbedItem = hit;
@@ -1201,6 +1333,11 @@ function onVRSelectEnd(controller) {
   if (grabbedUI && uiGrabController === controller) {
     grabbedUI = null;
     uiGrabController = null;
+  }
+
+  if (isDraggingMannequin && mannequinGrabController === controller) {
+    isDraggingMannequin = false;
+    mannequinGrabController = null;
   }
 
   if (grabbedItem && grabController === controller) {
@@ -1274,6 +1411,24 @@ function animate() {
   borderWireMat.opacity = 0.85 + Math.sin(t * 3.0) * 0.15;
   frameMat.emissiveIntensity = isForming ? frameMat.emissiveIntensity : (0.7 + Math.sin(t * 3.0) * 0.3);
   nodeMat.size = 0.020 + Math.sin(t * 3.5) * 0.006;
+  mannequinRing.material.opacity = 0.55 + Math.sin(t * 2.5) * 0.25;
+
+  // Equipment Particle FX Update
+  if (isEquipFxActive) {
+    equipFxTimer += dt;
+    const ep = Math.min(1, equipFxTimer / EQUIP_FX_DURATION);
+    equipMat.opacity = Math.max(0, 1.0 - ep * 1.25);
+    for (let i = 0; i < NUM_EQUIP_PARTICLES; i++) {
+      equipPositions[i * 3 + 0] += equipVelocities[i * 3 + 0] * dt;
+      equipPositions[i * 3 + 1] += equipVelocities[i * 3 + 1] * dt;
+      equipPositions[i * 3 + 2] += equipVelocities[i * 3 + 2] * dt;
+    }
+    equipGeo.attributes.position.needsUpdate = true;
+    if (equipFxTimer >= EQUIP_FX_DURATION) {
+      isEquipFxActive = false;
+      equipMat.opacity = 0;
+    }
+  }
 
   if (isForming) {
     formTimer += dt;
@@ -1362,14 +1517,21 @@ function animate() {
     }
   }
 
-  // Orient all floating labels towards camera
-  for (const label of labels) {
-    if (label.visible) {
-      label.quaternion.copy(camera.quaternion);
+  // Hover-Only visibility for object labels & orient towards camera
+  for (const mesh of allPartMeshes) {
+    const label = mesh.userData.label;
+    if (label) {
+      const isVRHover = controllers.some((c) => c.userData.hovered === mesh);
+      const isMouseHover = mouseHovered === mesh;
+      const isGrab = mesh.userData.isGrabbed || selectedPartForSwap === mesh;
+      label.visible = isVRHover || isMouseHover || isGrab;
+      if (label.visible) {
+        label.quaternion.copy(camera.quaternion);
+      }
     }
   }
 
-  // In VR, update grabbed item position along controller ray
+  // In VR, update grabbed item & mannequin positions
   if (renderer.xr.isPresenting) {
     if (grabbedUI && uiGrabController) {
       const rayOrigin = uiGrabController.getWorldPosition(new THREE.Vector3());
@@ -1378,6 +1540,21 @@ function animate() {
       );
       grabbedUI.position.copy(rayOrigin).addScaledVector(rayDir, uiGrabDist);
       grabbedUI.lookAt(camera.getWorldPosition(new THREE.Vector3()));
+    }
+
+    if (isDraggingMannequin && mannequinGrabController) {
+      const rayOrigin = mannequinGrabController.getWorldPosition(new THREE.Vector3());
+      const rayDir = new THREE.Vector3(0, 0, -1).applyQuaternion(
+        mannequinGrabController.getWorldQuaternion(new THREE.Quaternion())
+      );
+      if (Math.abs(rayDir.y) > 0.02) {
+        const dist = -rayOrigin.y / rayDir.y;
+        if (dist > 0 && dist < 8) {
+          const pt = rayOrigin.clone().addScaledVector(rayDir, dist);
+          mannequin.position.x = pt.x;
+          mannequin.position.z = pt.z;
+        }
+      }
     }
 
     if (grabbedItem && grabController) {
@@ -1419,7 +1596,7 @@ function animate() {
 }
 renderer.setAnimationLoop(animate);
 
-// --- Desktop Preview Controls (Drag & Drop + Click to Swap) ---
+// --- Desktop Preview Controls (Drag & Drop + Click to Swap + Mannequin Drag) ---
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
@@ -1468,6 +1645,13 @@ renderer.domElement.addEventListener('pointerdown', (e) => {
     shuffleAndAssign();
   } else if (hit === hud) {
     isDraggingUI = true;
+  } else if (
+    hit === mannequinCollider ||
+    hit === mannequinRing ||
+    hit === mannequinShadow ||
+    hit?.userData?.isMannequin
+  ) {
+    isDraggingMannequin = true;
   } else if (hit && hit.userData.isPart) {
     // Start dragging part
     grabbedItem = hit;
@@ -1486,6 +1670,10 @@ addEventListener('pointerup', (e) => {
 
   if (isDraggingUI) {
     isDraggingUI = false;
+  }
+
+  if (isDraggingMannequin) {
+    isDraggingMannequin = false;
   }
 
   if (isDraggingPart && grabbedItem) {
@@ -1518,6 +1706,16 @@ renderer.domElement.addEventListener('pointermove', (e) => {
     if (raycaster.ray.intersectPlane(dragPlane, panelPoint)) {
       hud.position.copy(panelPoint);
       hud.lookAt(camera.position);
+    }
+    return;
+  }
+
+  if (isDraggingMannequin) {
+    const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    const intersectPoint = new THREE.Vector3();
+    if (raycaster.ray.intersectPlane(floorPlane, intersectPoint)) {
+      mannequin.position.x = intersectPoint.x;
+      mannequin.position.z = intersectPoint.z;
     }
     return;
   }
