@@ -68,7 +68,7 @@ function buildMannequin() {
 const proceduralMannequinGroup = new THREE.Group();
 const mannequin = buildMannequin();
 mannequin.position.set(0, 0, -1.9);
-mannequin.rotation.y = Math.PI;
+mannequin.rotation.y = 0; // Front of Blender mannequin faces forward towards player
 scene.add(mannequin);
 
 function makeShape(part) {
@@ -564,9 +564,9 @@ function loadGLBModels() {
         }
       });
 
-      // 1. Process MANNEQUIN_body
-      gltf.scene.traverse((child) => {
-        if (child.isMesh && child.name && child.name.startsWith('MANNEQUIN')) {
+      // 1. Process MANNEQUIN_body (supports Group and Mesh)
+      gltf.scene.children.forEach((child) => {
+        if (child.name && child.name.startsWith('MANNEQUIN')) {
           proceduralMannequinGroup.visible = false;
           const bodyClone = child.clone();
           bodyClone.position.set(child.position.x - refX, child.position.y, child.position.z - refZ);
@@ -577,59 +577,74 @@ function loadGLBModels() {
         }
       });
 
-      // 2. Process PART_ and EQUIPPED_ meshes
-      gltf.scene.traverse((child) => {
-        if (!child.isMesh || !child.name) return;
-
-        if (child.name.startsWith('PART_')) {
-          const partId = child.name.replace('PART_', '');
-          const gridMesh = partsById.get(partId);
-          if (gridMesh && child.geometry) {
-            gridMesh.geometry.dispose();
-            const geo = child.geometry.clone();
-            geo.center();
-
-            geo.computeBoundingBox();
-            const size = new THREE.Vector3();
-            geo.boundingBox.getSize(size);
-            const maxDim = Math.max(size.x, size.y, size.z);
-            if (maxDim > 0.24) {
-              const scaleFactor = 0.18 / maxDim;
-              geo.scale(scaleFactor, scaleFactor, scaleFactor);
-            }
-            gridMesh.geometry = geo;
-
-            geo.computeBoundingBox();
-            geo.boundingBox.getSize(size);
-            gridMesh.userData.halfH = Math.max(0.035, size.y / 2);
-
-            if (child.material) {
-              gridMesh.material = Array.isArray(child.material)
-                ? child.material.map((m) => m.clone())
-                : child.material.clone();
-            }
-          }
-        } else if (child.name.startsWith('EQUIPPED_') || child.name.startsWith('FIT_')) {
+      // 2. Process EQUIPPED_ nodes (fitted suit on mannequin)
+      gltf.scene.children.forEach((child) => {
+        if (child.name && (child.name.startsWith('EQUIPPED_') || child.name.startsWith('FIT_'))) {
           let partId = child.name.replace('EQUIPPED_', '').replace('FIT_', '');
           if (partId === 'trousers.001') partId = 'pem';
 
           const mannequinMesh = mannequinClones.get(partId);
-          if (mannequinMesh && child.geometry) {
+          if (mannequinMesh) {
+            // Remove procedural shape and make container transparent
             mannequinMesh.geometry.dispose();
-            mannequinMesh.geometry = child.geometry.clone();
-            mannequinMesh.position.set(
-              child.position.x - refX,
-              child.position.y,
-              child.position.z - refZ
-            );
-            mannequinMesh.quaternion.copy(child.quaternion);
-            mannequinMesh.scale.copy(child.scale);
+            mannequinMesh.geometry = new THREE.BufferGeometry();
+            mannequinMesh.material = new THREE.MeshBasicMaterial({ visible: false });
 
-            if (child.material) {
-              mannequinMesh.material = Array.isArray(child.material)
-                ? child.material.map((m) => m.clone())
-                : child.material.clone();
+            while (mannequinMesh.children.length > 0) {
+              mannequinMesh.remove(mannequinMesh.children[0]);
             }
+
+            const clone = child.clone();
+            clone.position.set(child.position.x - refX, child.position.y, child.position.z - refZ);
+            clone.quaternion.copy(child.quaternion);
+            clone.scale.copy(child.scale);
+            clone.visible = true;
+            mannequinMesh.add(clone);
+          }
+        }
+      });
+
+      // 3. Process PART_ nodes (table slot models)
+      gltf.scene.children.forEach((child) => {
+        if (child.name && child.name.startsWith('PART_')) {
+          const partId = child.name.replace('PART_', '');
+          const gridMesh = partsById.get(partId);
+          if (gridMesh) {
+            while (gridMesh.children.length > 0) {
+              gridMesh.remove(gridMesh.children[0]);
+            }
+
+            const clone = child.clone();
+            clone.position.set(0, 0, 0);
+            clone.rotation.set(0, 0, 0);
+
+            // Center geometry inside carrier box
+            const bbox = new THREE.Box3().setFromObject(clone);
+            const center = new THREE.Vector3();
+            bbox.getCenter(center);
+            clone.position.sub(center);
+
+            // Scale to fit nicely within slot pad
+            const size = new THREE.Vector3();
+            bbox.getSize(size);
+            const maxDim = Math.max(size.x, size.y, size.z);
+            if (maxDim > 0.001) {
+              const targetSize = 0.18;
+              const scaleFactor = Math.min(1.5, targetSize / Math.max(0.18, maxDim));
+              clone.scale.multiplyScalar(scaleFactor);
+              clone.position.multiplyScalar(scaleFactor);
+            }
+
+            const scaledBbox = new THREE.Box3().setFromObject(clone);
+            scaledBbox.getSize(size);
+            gridMesh.userData.halfH = Math.max(0.04, size.y / 2);
+
+            // Make carrier mesh an invisible collider
+            gridMesh.geometry.dispose();
+            gridMesh.geometry = new THREE.BoxGeometry(0.20, Math.max(0.08, size.y), 0.16);
+            gridMesh.material = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
+
+            gridMesh.add(clone);
           }
         }
       });
