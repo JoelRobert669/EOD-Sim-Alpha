@@ -282,44 +282,6 @@ function createGlowParticleTexture() {
 }
 const particleTexture = createGlowParticleTexture();
 
-// Grid Node Points
-const nodeGeo = new THREE.BufferGeometry().setFromPoints(nodePoints);
-const nodeMat = new THREE.PointsMaterial({
-  color: 0x00ffff,
-  size: 0.022,
-  map: particleTexture,
-  transparent: true,
-  opacity: 0.9,
-  blending: THREE.AdditiveBlending,
-  depthWrite: false,
-});
-const gridNodes = new THREE.Points(nodeGeo, nodeMat);
-holoGridGroup.add(gridNodes);
-
-// 4. Cyber Corner Brackets
-function createCornerBracket(x, z, rotY) {
-  const bracketGroup = new THREE.Group();
-  const bMat = new THREE.MeshStandardMaterial({
-    color: 0x00ffff,
-    emissive: 0x00ffff,
-    emissiveIntensity: 1.2,
-  });
-  const armLen = 0.07;
-  const armThick = 0.007;
-  const arm1 = new THREE.Mesh(new THREE.BoxGeometry(armLen, 0.006, armThick), bMat);
-  arm1.position.set(armLen / 2, lineY + 0.003, 0);
-  const arm2 = new THREE.Mesh(new THREE.BoxGeometry(armThick, 0.006, armLen), bMat);
-  arm2.position.set(0, lineY + 0.003, armLen / 2);
-  bracketGroup.add(arm1, arm2);
-  bracketGroup.position.set(x, 0, z);
-  bracketGroup.rotation.y = rotY;
-  return bracketGroup;
-}
-holoGridGroup.add(createCornerBracket(-halfW + 0.01, -halfD + 0.01, 0));
-holoGridGroup.add(createCornerBracket(halfW - 0.01, -halfD + 0.01, -Math.PI / 2));
-holoGridGroup.add(createCornerBracket(halfW - 0.01, halfD - 0.01, Math.PI));
-holoGridGroup.add(createCornerBracket(-halfW + 0.01, halfD - 0.01, Math.PI / 2));
-
 // --- Holographic Forming Materialization Particles (Active only during refresh/reset) ---
 const NUM_FORM_PARTICLES = 120;
 const formPositions = new Float32Array(NUM_FORM_PARTICLES * 3);
@@ -1569,10 +1531,8 @@ function animate() {
   holoGridGroup.position.y = gridOrigin.y + Math.sin(t * 1.5) * 0.006;
 
   // Glowing pulse on holographic grid lines and outer edges
-  majorGridMat.opacity = 0.85 + Math.sin(t * 3.0) * 0.15;
-  borderWireMat.opacity = 0.85 + Math.sin(t * 3.0) * 0.15;
-  frameMat.emissiveIntensity = isForming ? frameMat.emissiveIntensity : (0.7 + Math.sin(t * 3.0) * 0.3);
-  nodeMat.size = 0.020 + Math.sin(t * 3.5) * 0.006;
+  majorGridMat.opacity = 0.45 + Math.sin(t * 2.0) * 0.1;
+  borderWireMat.opacity = 0.75 + Math.sin(t * 2.5) * 0.15;
   mannequinRing.material.opacity = 0.55 + Math.sin(t * 2.5) * 0.25;
   mannequinRotateRing.material.opacity = 0.6 + Math.sin(t * 2.0) * 0.2;
 
