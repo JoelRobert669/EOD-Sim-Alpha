@@ -322,70 +322,49 @@ function initFormingParticles() {
   formGeo.attributes.position.needsUpdate = true;
 }
 
-// --- 3D Volumetric Holographic Equipment FX System ---
-const NUM_EQUIP_PARTICLES = 250;
-const equipPositions = new Float32Array(NUM_EQUIP_PARTICLES * 3);
-const equipVelocities = new Float32Array(NUM_EQUIP_PARTICLES * 3);
-const equipAngles = new Float32Array(NUM_EQUIP_PARTICLES);
-const equipRadii = new Float32Array(NUM_EQUIP_PARTICLES);
-const equipOrbitalSpeeds = new Float32Array(NUM_EQUIP_PARTICLES);
-const equipBaseWorldPos = new THREE.Vector3();
+// --- Apple VisionOS Spatial Precision Materialization FX System ---
+// 1. Razor-Thin Optical Light Ring Sweep (Hugs the suit piece as it scans down)
+const sweepRingGeo = new THREE.TorusGeometry(0.18, 0.0018, 16, 64);
+const sweepRingMat = new THREE.MeshBasicMaterial({
+  color: 0x93c5fd, // Soft optical ice-blue
+  transparent: true,
+  opacity: 0,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending,
+});
+const equipSweepRing = new THREE.Mesh(sweepRingGeo, sweepRingMat);
+equipSweepRing.rotation.x = Math.PI / 2;
+scene.add(equipSweepRing);
 
-for (let i = 0; i < NUM_EQUIP_PARTICLES; i++) {
-  equipPositions[i * 3 + 1] = -100;
+// 2. Micro-Dust Pinpoint Optical Sparkles (24 tiny ambient dust specs)
+const NUM_SPARKLES = 24;
+const sparklePositions = new Float32Array(NUM_SPARKLES * 3);
+const sparkleVelocities = new Float32Array(NUM_SPARKLES * 3);
+for (let i = 0; i < NUM_SPARKLES; i++) {
+  sparklePositions[i * 3 + 1] = -100;
 }
-const equipGeo = new THREE.BufferGeometry();
-equipGeo.setAttribute('position', new THREE.BufferAttribute(equipPositions, 3));
-const equipMat = new THREE.PointsMaterial({
-  color: 0x00ffff,
-  size: 0.15,
+const sparkleGeo = new THREE.BufferGeometry();
+sparkleGeo.setAttribute('position', new THREE.BufferAttribute(sparklePositions, 3));
+const sparkleMat = new THREE.PointsMaterial({
+  color: 0xdbeafe, // Soft ice white
+  size: 0.012,
   map: particleTexture,
   transparent: true,
   opacity: 0,
   blending: THREE.AdditiveBlending,
   depthWrite: false,
-  sizeAttenuation: true,
 });
-const equipParticleSystem = new THREE.Points(equipGeo, equipMat);
-scene.add(equipParticleSystem);
+const equipSparkleSystem = new THREE.Points(sparkleGeo, sparkleMat);
+scene.add(equipSparkleSystem);
 
-// 3D Volumetric Holographic Scan Wireframe Cylinder
-const holoScanGeo = new THREE.CylinderGeometry(0.24, 0.28, 0.45, 16, 6, true);
-const holoScanMat = new THREE.MeshBasicMaterial({
-  color: 0x00ffff,
-  wireframe: true,
-  transparent: true,
-  opacity: 0,
-  blending: THREE.AdditiveBlending,
-  depthWrite: false,
-});
-const holoScanCage = new THREE.Mesh(holoScanGeo, holoScanMat);
-scene.add(holoScanCage);
-
-// Primary Horizontal Shockwave Ring
-const shockwaveRingGeo = new THREE.RingGeometry(0.06, 0.12, 36);
-const shockwaveRingMat = new THREE.MeshBasicMaterial({
-  color: 0x00ffff,
-  transparent: true,
-  opacity: 0,
-  side: THREE.DoubleSide,
-  blending: THREE.AdditiveBlending,
-  depthWrite: false,
-});
-const shockwaveRing = new THREE.Mesh(shockwaveRingGeo, shockwaveRingMat);
-shockwaveRing.rotation.x = -Math.PI / 2;
-scene.add(shockwaveRing);
-
-// Secondary Tilted 3D Shockwave Ring (Cross-orbital spherical shell effect)
-const shockwaveRing2 = new THREE.Mesh(shockwaveRingGeo, shockwaveRingMat);
-shockwaveRing2.rotation.x = -Math.PI / 4;
-shockwaveRing2.rotation.y = Math.PI / 4;
-scene.add(shockwaveRing2);
-
+const equipBaseWorldPos = new THREE.Vector3();
 let isEquipFxActive = false;
 let equipFxTimer = 0;
-const EQUIP_FX_DURATION = 1.1;
+const EQUIP_FX_DURATION = 0.42; // Snappy, elegant 420ms Apple spring animation
 let activeEquipClone = null;
+let equipStartY = 0;
+let equipEndY = 0;
+let equipRadius = 0.18;
 
 function getEquipWorldPosition(partId) {
   const clone = mannequinClones.get(partId);
@@ -410,38 +389,46 @@ function triggerEquipFX(worldPos, cloneMesh = null) {
   equipBaseWorldPos.copy(worldPos);
   activeEquipClone = cloneMesh;
 
+  let halfH = 0.12;
+  let rad = 0.18;
   if (activeEquipClone) {
-    setEmissive(activeEquipClone, 0x00ffff, 2.8);
+    const bbox = new THREE.Box3().setFromObject(activeEquipClone);
+    if (!bbox.isEmpty()) {
+      const sz = new THREE.Vector3();
+      bbox.getSize(sz);
+      halfH = Math.max(0.06, sz.y / 2);
+      rad = Math.max(0.09, Math.max(sz.x, sz.z) / 2 + 0.02);
+    }
+    // Apple damped spring start: slight scale down
+    activeEquipClone.scale.set(0.92, 0.92, 0.92);
+    setEmissive(activeEquipClone, 0x38bdf8, 0.65);
   }
 
-  equipMat.opacity = 1.0;
-  holoScanMat.opacity = 0.85;
-  holoScanCage.position.copy(worldPos);
-  holoScanCage.scale.set(0.6, 0.6, 0.6);
+  equipRadius = rad;
+  equipStartY = worldPos.y + halfH + 0.02;
+  equipEndY = worldPos.y - halfH - 0.02;
 
-  shockwaveRing.position.copy(worldPos);
-  shockwaveRing.scale.set(1, 1, 1);
-  shockwaveRing2.position.copy(worldPos);
-  shockwaveRing2.scale.set(1, 1, 1);
-  shockwaveRingMat.opacity = 0.95;
+  // Setup optical sweep ring
+  equipSweepRing.position.set(worldPos.x, equipStartY, worldPos.z);
+  const ringScale = rad / 0.18;
+  equipSweepRing.scale.set(ringScale, ringScale, ringScale);
+  sweepRingMat.opacity = 0.85;
 
-  for (let i = 0; i < NUM_EQUIP_PARTICLES; i++) {
+  // Setup subtle micro sparkles
+  for (let i = 0; i < NUM_SPARKLES; i++) {
     const angle = Math.random() * Math.PI * 2;
-    const radius = 0.06 + Math.random() * 0.26;
-    equipAngles[i] = angle;
-    equipRadii[i] = radius;
-    equipOrbitalSpeeds[i] = (Math.random() > 0.5 ? 1 : -1) * (4.0 + Math.random() * 6.0);
+    const r = rad * (0.8 + Math.random() * 0.3);
+    const yOff = (Math.random() - 0.5) * halfH * 1.5;
+    sparklePositions[i * 3 + 0] = worldPos.x + Math.cos(angle) * r;
+    sparklePositions[i * 3 + 1] = worldPos.y + yOff;
+    sparklePositions[i * 3 + 2] = worldPos.z + Math.sin(angle) * r;
 
-    const spawnY = worldPos.y + (Math.random() - 0.5) * 0.35;
-    equipPositions[i * 3 + 0] = worldPos.x + Math.cos(angle) * radius;
-    equipPositions[i * 3 + 1] = spawnY;
-    equipPositions[i * 3 + 2] = worldPos.z + Math.sin(angle) * radius;
-
-    equipVelocities[i * 3 + 0] = (Math.random() - 0.5) * 0.4;
-    equipVelocities[i * 3 + 1] = 0.3 + Math.random() * 0.85; // ascending spiral stream
-    equipVelocities[i * 3 + 2] = (Math.random() - 0.5) * 0.4;
+    sparkleVelocities[i * 3 + 0] = Math.cos(angle) * 0.04;
+    sparkleVelocities[i * 3 + 1] = (Math.random() - 0.5) * 0.025;
+    sparkleVelocities[i * 3 + 2] = Math.sin(angle) * 0.04;
   }
-  equipGeo.attributes.position.needsUpdate = true;
+  sparkleGeo.attributes.position.needsUpdate = true;
+  sparkleMat.opacity = 0.75;
 }
 
 // --- Transparent Holographic Slot Pads (Grid passes cleanly through!) ---
@@ -1536,55 +1523,40 @@ function animate() {
   mannequinRing.material.opacity = 0.55 + Math.sin(t * 2.5) * 0.25;
   mannequinRotateRing.material.opacity = 0.6 + Math.sin(t * 2.0) * 0.2;
 
-  // 3D Volumetric Equipment Particle FX & Holographic Scan Update
+  // Apple VisionOS Spatial Precision Materialization Animation Update
   if (isEquipFxActive) {
     equipFxTimer += dt;
-    const ep = Math.min(1, equipFxTimer / EQUIP_FX_DURATION);
-    const easeOut = 1 - Math.pow(1 - ep, 3);
+    const p = Math.min(1, equipFxTimer / EQUIP_FX_DURATION);
 
-    // Particle alpha fade
-    equipMat.opacity = Math.max(0, (1.0 - ep) * 1.3);
-
-    // Holographic Wireframe Cage Scan
-    holoScanCage.rotation.y += dt * 4.5;
-    holoScanCage.position.y = equipBaseWorldPos.y + (ep - 0.5) * 0.15;
-    const cageScale = 0.7 + easeOut * 0.6;
-    holoScanCage.scale.set(cageScale, 1.0 + easeOut * 0.3, cageScale);
-    holoScanMat.opacity = Math.max(0, (1.0 - ep * 1.1) * 0.85);
-
-    // Dual Expanding Shockwaves
-    const ringScale = 1.0 + easeOut * 6.5;
-    shockwaveRing.scale.set(ringScale, ringScale, ringScale);
-    shockwaveRing2.scale.set(ringScale * 0.85, ringScale * 0.85, ringScale * 0.85);
-    shockwaveRing2.rotation.z += dt * 2.5;
-    shockwaveRingMat.opacity = Math.max(0, (1.0 - ep) * 0.95);
-
-    // Fade suit piece emissive flare
+    // 1. Apple Damped Spring Curve for suit piece scale pop (0.92 -> 1.025 -> 1.00)
     if (activeEquipClone) {
-      setEmissive(activeEquipClone, 0x00ffff, Math.max(0, 2.8 * (1.0 - ep * 1.4)));
+      const springVal = 1.0 + Math.sin(p * Math.PI * 2.2) * Math.exp(-p * 4.5) * 0.08 - (1 - p) * 0.08;
+      const s = Math.min(1.03, Math.max(0.92, springVal));
+      activeEquipClone.scale.set(s, s, s);
+      // Soft optical specular pulse fade
+      setEmissive(activeEquipClone, 0x38bdf8, Math.max(0, 0.65 * (1.0 - p * 1.2)));
     }
 
-    // 3D Volumetric Spiral Vortex Physics
-    for (let i = 0; i < NUM_EQUIP_PARTICLES; i++) {
-      equipAngles[i] += equipOrbitalSpeeds[i] * dt;
-      equipRadii[i] += 0.18 * dt; // expanding spiral radius
+    // 2. Razor-Thin Optical Light Ring Sweep (Top -> Bottom)
+    const sweepEase = Math.sin((p * Math.PI) / 2);
+    equipSweepRing.position.y = THREE.MathUtils.lerp(equipStartY, equipEndY, sweepEase);
+    sweepRingMat.opacity = Math.max(0, Math.sin(p * Math.PI) * 0.85);
 
-      const px = equipBaseWorldPos.x + Math.cos(equipAngles[i]) * equipRadii[i] + equipVelocities[i * 3 + 0] * (equipFxTimer * 0.5);
-      const py = equipPositions[i * 3 + 1] + equipVelocities[i * 3 + 1] * dt;
-      const pz = equipBaseWorldPos.z + Math.sin(equipAngles[i]) * equipRadii[i] + equipVelocities[i * 3 + 2] * (equipFxTimer * 0.5);
-
-      equipPositions[i * 3 + 0] = px;
-      equipPositions[i * 3 + 1] = py;
-      equipPositions[i * 3 + 2] = pz;
+    // 3. Ambient Micro-Dust Sparkles Dissolve
+    sparkleMat.opacity = Math.max(0, (1.0 - p) * 0.75);
+    for (let i = 0; i < NUM_SPARKLES; i++) {
+      sparklePositions[i * 3 + 0] += sparkleVelocities[i * 3 + 0] * dt;
+      sparklePositions[i * 3 + 1] += sparkleVelocities[i * 3 + 1] * dt;
+      sparklePositions[i * 3 + 2] += sparkleVelocities[i * 3 + 2] * dt;
     }
-    equipGeo.attributes.position.needsUpdate = true;
+    sparkleGeo.attributes.position.needsUpdate = true;
 
     if (equipFxTimer >= EQUIP_FX_DURATION) {
       isEquipFxActive = false;
-      equipMat.opacity = 0;
-      holoScanMat.opacity = 0;
-      shockwaveRingMat.opacity = 0;
+      sweepRingMat.opacity = 0;
+      sparkleMat.opacity = 0;
       if (activeEquipClone) {
+        activeEquipClone.scale.set(1, 1, 1);
         setEmissive(activeEquipClone, 0x000000, 0);
         activeEquipClone = null;
       }
