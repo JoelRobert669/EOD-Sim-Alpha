@@ -398,8 +398,8 @@ function initFormingParticles() {
   formGeo.attributes.position.needsUpdate = true;
 }
 
-// --- Holographic Equipment Particle Burst FX (When new part equips onto body) ---
-const NUM_EQUIP_PARTICLES = 60;
+// --- Holographic Equipment Particle Burst FX & Shockwave (When new part equips onto body) ---
+const NUM_EQUIP_PARTICLES = 120;
 const equipPositions = new Float32Array(NUM_EQUIP_PARTICLES * 3);
 const equipVelocities = new Float32Array(NUM_EQUIP_PARTICLES * 3);
 for (let i = 0; i < NUM_EQUIP_PARTICLES; i++) {
@@ -409,33 +409,69 @@ const equipGeo = new THREE.BufferGeometry();
 equipGeo.setAttribute('position', new THREE.BufferAttribute(equipPositions, 3));
 const equipMat = new THREE.PointsMaterial({
   color: 0x00ffff,
-  size: 0.045,
+  size: 0.12,
   map: particleTexture,
   transparent: true,
   opacity: 0,
   blending: THREE.AdditiveBlending,
   depthWrite: false,
+  sizeAttenuation: true,
 });
 const equipParticleSystem = new THREE.Points(equipGeo, equipMat);
 scene.add(equipParticleSystem);
 
+// Expanding Holographic Shockwave Ring on Equip
+const shockwaveRingGeo = new THREE.RingGeometry(0.06, 0.10, 36);
+const shockwaveRingMat = new THREE.MeshBasicMaterial({
+  color: 0x00ffff,
+  transparent: true,
+  opacity: 0,
+  side: THREE.DoubleSide,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+});
+const shockwaveRing = new THREE.Mesh(shockwaveRingGeo, shockwaveRingMat);
+shockwaveRing.rotation.x = -Math.PI / 2;
+scene.add(shockwaveRing);
+
 let isEquipFxActive = false;
 let equipFxTimer = 0;
-const EQUIP_FX_DURATION = 0.8;
+const EQUIP_FX_DURATION = 1.0;
+
+function getEquipWorldPosition(partId) {
+  const clone = mannequinClones.get(partId);
+  if (clone) {
+    const bbox = new THREE.Box3().setFromObject(clone);
+    if (!bbox.isEmpty()) {
+      const center = new THREE.Vector3();
+      bbox.getCenter(center);
+      if (center.y > 0.08) return center;
+    }
+  }
+  const manPos = new THREE.Vector3();
+  mannequin.getWorldPosition(manPos);
+  const part = PARTS.find((p) => p.id === partId);
+  const anchorY = ANCHORS[part?.anchor]?.[1] || 1.25;
+  return new THREE.Vector3(manPos.x, manPos.y + anchorY, manPos.z);
+}
 
 function triggerEquipFX(worldPos) {
   isEquipFxActive = true;
   equipFxTimer = 0;
   equipMat.opacity = 1.0;
+  shockwaveRing.position.copy(worldPos);
+  shockwaveRing.scale.set(1, 1, 1);
+  shockwaveRingMat.opacity = 0.9;
+
   for (let i = 0; i < NUM_EQUIP_PARTICLES; i++) {
-    equipPositions[i * 3 + 0] = worldPos.x + (Math.random() - 0.5) * 0.16;
-    equipPositions[i * 3 + 1] = worldPos.y + (Math.random() - 0.5) * 0.16;
-    equipPositions[i * 3 + 2] = worldPos.z + (Math.random() - 0.5) * 0.16;
+    equipPositions[i * 3 + 0] = worldPos.x + (Math.random() - 0.5) * 0.15;
+    equipPositions[i * 3 + 1] = worldPos.y + (Math.random() - 0.5) * 0.15;
+    equipPositions[i * 3 + 2] = worldPos.z + (Math.random() - 0.5) * 0.15;
 
     const angle = Math.random() * Math.PI * 2;
-    const speed = 0.25 + Math.random() * 0.45;
+    const speed = 0.4 + Math.random() * 0.8;
     equipVelocities[i * 3 + 0] = Math.cos(angle) * speed;
-    equipVelocities[i * 3 + 1] = 0.15 + Math.random() * 0.5; // upward burst
+    equipVelocities[i * 3 + 1] = 0.2 + Math.random() * 0.9; // swirling upward spark
     equipVelocities[i * 3 + 2] = Math.sin(angle) * speed;
   }
   equipGeo.attributes.position.needsUpdate = true;
@@ -1083,14 +1119,13 @@ function updateMannequinReflection() {
       const partId = mesh.userData.part.id;
       const clone = mannequinClones.get(partId);
       if (clone) {
-        if (!equippedState.get(partId) && !isForming) {
-          const worldPos = new THREE.Vector3();
-          clone.getWorldPosition(worldPos);
-          triggerEquipFX(worldPos);
-        }
         clone.visible = true;
+        if (!equippedState.get(partId)) {
+          equippedState.set(partId, true);
+          const equipPos = getEquipWorldPosition(partId);
+          triggerEquipFX(equipPos);
+        }
       }
-      equippedState.set(partId, true);
     } else {
       if (mesh) {
         const partId = mesh.userData.part.id;
@@ -1413,20 +1448,31 @@ function animate() {
   nodeMat.size = 0.020 + Math.sin(t * 3.5) * 0.006;
   mannequinRing.material.opacity = 0.55 + Math.sin(t * 2.5) * 0.25;
 
-  // Equipment Particle FX Update
+  // Equipment Particle FX & Shockwave Wave Update
   if (isEquipFxActive) {
     equipFxTimer += dt;
     const ep = Math.min(1, equipFxTimer / EQUIP_FX_DURATION);
-    equipMat.opacity = Math.max(0, 1.0 - ep * 1.25);
+    const easeOut = 1 - Math.pow(1 - ep, 3);
+    equipMat.opacity = Math.max(0, (1.0 - ep) * 1.3);
+
+    // Expanding Holographic Shockwave
+    const ringScale = 1.0 + easeOut * 7.0;
+    shockwaveRing.scale.set(ringScale, ringScale, ringScale);
+    shockwaveRingMat.opacity = Math.max(0, (1.0 - ep) * 0.9);
+
     for (let i = 0; i < NUM_EQUIP_PARTICLES; i++) {
       equipPositions[i * 3 + 0] += equipVelocities[i * 3 + 0] * dt;
       equipPositions[i * 3 + 1] += equipVelocities[i * 3 + 1] * dt;
       equipPositions[i * 3 + 2] += equipVelocities[i * 3 + 2] * dt;
+      equipVelocities[i * 3 + 0] *= 0.96;
+      equipVelocities[i * 3 + 1] *= 0.96;
+      equipVelocities[i * 3 + 2] *= 0.96;
     }
     equipGeo.attributes.position.needsUpdate = true;
     if (equipFxTimer >= EQUIP_FX_DURATION) {
       isEquipFxActive = false;
       equipMat.opacity = 0;
+      shockwaveRingMat.opacity = 0;
     }
   }
 
