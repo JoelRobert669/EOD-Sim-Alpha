@@ -74,8 +74,8 @@ android {
         applicationId "com.eod.suittrainer"
         minSdkVersion 26
         targetSdkVersion 32
-        versionCode 3
-        versionName "1.2.0"
+        versionCode 4
+        versionName "1.3.0"
     }
 
     buildTypes {
@@ -344,7 +344,7 @@ public class EODApplication extends Application {
 }
 `);
 
-  // MainActivity.java — opens URL in the Quest Browser via Intent
+  // MainActivity.java — opens URL in Meta Quest Browser via explicit Package Intent
   fs.writeFileSync(path.join(javaDir, "MainActivity.java"), `package com.eod.suittrainer;
 
 import android.app.Activity;
@@ -360,21 +360,29 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        Log.i(TAG, "Launching EOD Suit Trainer WebXR app");
+        Log.i(TAG, "Launching EOD Suit Trainer WebXR in Meta Quest Browser");
 
         // Small delay to ensure asset server is fully ready
         try { Thread.sleep(500); } catch (InterruptedException ignored) {}
 
-        // Launch in the system browser (Quest Browser supports WebXR)
+        // Target Meta Quest Browser directly (native WebXR + passthrough support)
         Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(URL));
+        browserIntent.setPackage("com.oculus.browser");
         browserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        startActivity(browserIntent);
 
-        // Keep the activity alive briefly so the browser can start
-        new Thread(() -> {
-            try { Thread.sleep(2000); } catch (InterruptedException ignored) {}
-            // Don't finish — keep app process alive so LocalAssetServer keeps running
-        }).start();
+        try {
+            startActivity(browserIntent);
+            Log.i(TAG, "Started com.oculus.browser successfully");
+        } catch (Exception e) {
+            Log.w(TAG, "Could not open with com.oculus.browser, trying generic Intent: " + e.getMessage());
+            try {
+                Intent fallbackIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(URL));
+                fallbackIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(fallbackIntent);
+            } catch (Exception ex) {
+                Log.e(TAG, "Failed to launch browser: " + ex.getMessage());
+            }
+        }
     }
 
     @Override
@@ -439,12 +447,23 @@ public class MainActivity extends Activity {
   execSync(`"${apksigner}" verify --verbose "${finalApk}"`, { env, stdio: "inherit" });
 
   const stats = fs.statSync(finalApk);
+  
+  // Copy to Z:\ drive path if available
+  const zOutputDir = "Z:/Media/Projects/Misc/XR/apk";
+  try {
+    fs.mkdirSync(zOutputDir, { recursive: true });
+    const zDest = path.join(zOutputDir, "eod-suit-trainer-v1.3.0.apk");
+    fs.copyFileSync(finalApk, zDest);
+    console.log("  ✅ Copied to Z: drive:", zDest);
+  } catch (zErr) {
+    console.log("  ℹ️ Z: drive copy skipped (" + zErr.message + ")");
+  }
+
   console.log("\n======================================================");
-  console.log("🎉 META QUEST APK v1.2.0 — REBUILT FROM SCRATCH");
+  console.log("🎉 META QUEST APK v1.3.0 — READY!");
   console.log("📁 Location:", finalApk);
   console.log("📦 Size:", (stats.size / (1024 * 1024)).toFixed(2), "MB");
-  console.log("   No TWA, no Custom Tabs, no R8 minification");
-  console.log("   Pure browser Intent — most reliable approach");
+  console.log("🎯 Native Target: com.oculus.browser (Meta Quest Browser)");
   console.log("======================================================");
 }
 
