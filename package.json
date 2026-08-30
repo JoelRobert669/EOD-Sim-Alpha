@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite --host",
     "build": "vite build",
-    "preview": "vite preview --host"
+    "preview": "vite preview --host",
+    "build:apk": "node scripts/build-apk.mjs",
+    "install:apk": "C:\\Users\\Admin\\.bubblewrap\\android_sdk\\platform-tools\\adb.exe install -r apk/eod-suit-trainer.apk"
   },
   "dependencies": {
     "three": "^0.169.0"
