@@ -190,144 +190,78 @@ for (const part of PARTS) {
   mannequinClones.set(part.id, cloneMesh);
 }
 
-// --- Floating High-Tech Blue Holographic Grid ---
+// --- VisionOS Floating Smoked Glass Work Surface ---
 const gridOrigin = new THREE.Vector3(0, 0.85, -0.65);
 const holoGridGroup = new THREE.Group();
 holoGridGroup.position.copy(gridOrigin);
 scene.add(holoGridGroup);
 
-const GRID_W = 1.44;
-const GRID_D = 0.88;
-const GRID_H = 0.015;
+const GRID_W = 1.48;
+const GRID_D = 0.90;
+const GRID_H = 0.022;
 
-// 1. Underlying Translucent Cyber Base Slab
+// 1. Smoked Glass Platform Slab (Apple VisionOS Glassmorphic Table)
+const glassSlabMat = new THREE.MeshStandardMaterial({
+  color: 0x09111e,
+  transparent: true,
+  opacity: 0.84,
+  roughness: 0.12,
+  metalness: 0.85,
+  emissive: 0x020713,
+  emissiveIntensity: 0.35,
+});
 const holoBaseSlab = new THREE.Mesh(
   new THREE.BoxGeometry(GRID_W, GRID_H, GRID_D),
-  new THREE.MeshStandardMaterial({
-    color: 0x020a1c,
-    transparent: true,
-    opacity: 0.88,
-    roughness: 0.1,
-    metalness: 0.9,
-    emissive: 0x01132b,
-    emissiveIntensity: 0.5,
-  })
+  glassSlabMat
 );
 holoBaseSlab.position.y = 0;
 holoGridGroup.add(holoBaseSlab);
 
-// 2. Glowing Outer Perimeter Frame Rails
-const frameMat = new THREE.MeshStandardMaterial({
-  color: 0x021c3d,
-  emissive: 0x00e5ff,
-  emissiveIntensity: 0.9,
-  roughness: 0.2,
-  metalness: 0.8,
-});
-
-const railThickness = 0.014;
-const railHeight = 0.020;
-
-// Front & Back rails
-for (const rz of [-GRID_D / 2, GRID_D / 2]) {
-  const rail = new THREE.Mesh(
-    new THREE.BoxGeometry(GRID_W + railThickness, railHeight, railThickness),
-    frameMat
-  );
-  rail.position.set(0, railHeight / 2 - GRID_H / 2, rz);
-  holoGridGroup.add(rail);
-}
-
-// Left & Right rails
-for (const rx of [-GRID_W / 2, GRID_W / 2]) {
-  const rail = new THREE.Mesh(
-    new THREE.BoxGeometry(railThickness, railHeight, GRID_D + railThickness),
-    frameMat
-  );
-  rail.position.set(rx, railHeight / 2 - GRID_H / 2, 0);
-  holoGridGroup.add(rail);
-}
-
-// 3. High-Contrast 3D Vector Grid Lines & Intersection Nodes
-const minorPoints = [];
-const majorPoints = [];
-const nodePoints = [];
-
-const stepX = 0.08;
-const stepZ = 0.09;
+// 2. Ultra-Thin Luminous Perimeter Bevel Rim
 const halfW = GRID_W / 2;
 const halfD = GRID_D / 2;
 const lineY = GRID_H / 2 + 0.002;
 
-// Vertical lines (along Z)
-let colIdx = 0;
-for (let x = -halfW; x <= halfW + 0.001; x += stepX) {
-  const isMajor = colIdx % 2 === 0;
-  const targetArray = isMajor ? majorPoints : minorPoints;
-  targetArray.push(new THREE.Vector3(x, lineY, -halfD), new THREE.Vector3(x, lineY, halfD));
-  colIdx++;
-}
-
-// Horizontal lines (along X)
-let rowIdx = 0;
-for (let z = -halfD; z <= halfD + 0.001; z += stepZ) {
-  const isMajor = rowIdx % 2 === 0;
-  const targetArray = isMajor ? majorPoints : minorPoints;
-  targetArray.push(new THREE.Vector3(-halfW, lineY, z), new THREE.Vector3(halfW, lineY, z));
-  rowIdx++;
-}
-
-// Node points at major intersections
-for (let x = -halfW; x <= halfW + 0.001; x += stepX * 2) {
-  for (let z = -halfD; z <= halfD + 0.001; z += stepZ * 2) {
-    nodePoints.push(new THREE.Vector3(x, lineY + 0.001, z));
-  }
-}
-
-// Minor grid lines
-const minorGridMat = new THREE.LineBasicMaterial({
-  color: 0x0088dd,
-  transparent: true,
-  opacity: 0.65,
-});
-const minorGrid = new THREE.LineSegments(
-  new THREE.BufferGeometry().setFromPoints(minorPoints),
-  minorGridMat
-);
-holoGridGroup.add(minorGrid);
-
-// Major grid lines
-const majorGridMat = new THREE.LineBasicMaterial({
-  color: 0x00ffff,
-  transparent: true,
-  opacity: 1.0,
-});
-const majorGrid = new THREE.LineSegments(
-  new THREE.BufferGeometry().setFromPoints(majorPoints),
-  majorGridMat
-);
-holoGridGroup.add(majorGrid);
-
-// Outer luminous neon border wire
-const borderPoints = [
-  new THREE.Vector3(-halfW, lineY + 0.001, -halfD),
-  new THREE.Vector3(halfW, lineY + 0.001, -halfD),
-  new THREE.Vector3(halfW, lineY + 0.001, -halfD),
-  new THREE.Vector3(halfW, lineY + 0.001, halfD),
-  new THREE.Vector3(halfW, lineY + 0.001, halfD),
-  new THREE.Vector3(-halfW, lineY + 0.001, halfD),
-  new THREE.Vector3(-halfW, lineY + 0.001, halfD),
-  new THREE.Vector3(-halfW, lineY + 0.001, -halfD),
-];
-const borderWireMat = new THREE.LineBasicMaterial({
+const rimLineMat = new THREE.LineBasicMaterial({
   color: 0x38bdf8,
   transparent: true,
-  opacity: 1.0,
+  opacity: 0.75,
 });
+const rimPoints = [
+  new THREE.Vector3(-halfW, lineY, -halfD), new THREE.Vector3(halfW, lineY, -halfD),
+  new THREE.Vector3(halfW, lineY, -halfD), new THREE.Vector3(halfW, lineY, halfD),
+  new THREE.Vector3(halfW, lineY, halfD), new THREE.Vector3(-halfW, lineY, halfD),
+  new THREE.Vector3(-halfW, lineY, halfD), new THREE.Vector3(-halfW, lineY, -halfD),
+];
 const borderWire = new THREE.LineSegments(
-  new THREE.BufferGeometry().setFromPoints(borderPoints),
-  borderWireMat
+  new THREE.BufferGeometry().setFromPoints(rimPoints),
+  rimLineMat
 );
+holoGridGroup.add(borderWire);
+const borderWireMat = rimLineMat;
+const frameMat = glassSlabMat;
+
+// 3. Subtle Embedded Technical Grid
+const stepX = 0.08;
+const stepZ = 0.09;
+const gridPoints = [];
+for (let x = -halfW + stepX; x < halfW; x += stepX) {
+  gridPoints.push(new THREE.Vector3(x, lineY, -halfD + 0.04), new THREE.Vector3(x, lineY, halfD - 0.04));
+}
+for (let z = -halfD + stepZ; z < halfD; z += stepZ) {
+  gridPoints.push(new THREE.Vector3(-halfW + 0.04, lineY, z), new THREE.Vector3(halfW - 0.04, lineY, z));
+}
+const embeddedGridMat = new THREE.LineBasicMaterial({
+  color: 0x1e293b,
+  transparent: true,
+  opacity: 0.45,
+});
+const majorGrid = new THREE.LineSegments(
+  new THREE.BufferGeometry().setFromPoints(gridPoints),
+  embeddedGridMat
+);
+const majorGridMat = embeddedGridMat;
+holoGridGroup.add(majorGrid);
 holoGridGroup.add(borderWire);
 
 // Glowing Particle Sprites Helper
@@ -563,71 +497,100 @@ function drawRoundedRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
+// --- Apple VisionOS Glassmorphism Drawing Helper ---
+function drawVisionOSGlass(ctx, x, y, w, h, r, options = {}) {
+  const { bgAlpha = 0.68, borderAlpha = 0.28, shadow = true } = options;
+
+  if (shadow) {
+    ctx.save();
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
+    ctx.shadowBlur = 24;
+    ctx.shadowOffsetY = 8;
+  }
+
+  // Smoked Translucent Dark Glass Body
+  const glassGrad = ctx.createLinearGradient(x, y, x, y + h);
+  glassGrad.addColorStop(0, `rgba(16, 24, 38, ${bgAlpha})`);
+  glassGrad.addColorStop(0.5, `rgba(9, 14, 24, ${bgAlpha * 1.1})`);
+  glassGrad.addColorStop(1, `rgba(5, 8, 16, ${bgAlpha * 1.25})`);
+  ctx.fillStyle = glassGrad;
+  drawRoundedRect(ctx, x, y, w, h, r);
+  ctx.fill();
+
+  if (shadow) {
+    ctx.restore();
+  }
+
+  // Ultra-Thin Crisp White/Cyan Border
+  const borderGrad = ctx.createLinearGradient(x, y, x + w, y + h);
+  borderGrad.addColorStop(0, `rgba(255, 255, 255, ${borderAlpha * 1.5})`);
+  borderGrad.addColorStop(0.25, `rgba(56, 189, 248, ${borderAlpha * 1.1})`);
+  borderGrad.addColorStop(0.7, `rgba(255, 255, 255, ${borderAlpha * 0.4})`);
+  borderGrad.addColorStop(1, `rgba(0, 0, 0, 0.4)`);
+  ctx.strokeStyle = borderGrad;
+  ctx.lineWidth = 2.5;
+  drawRoundedRect(ctx, x + 1, y + 1, w - 2, h - 2, r - 1);
+  ctx.stroke();
+
+  // Subtle Top-Edge Sheen
+  ctx.beginPath();
+  ctx.moveTo(x + r * 1.2, y + 2.5);
+  ctx.lineTo(x + w - r * 1.2, y + 2.5);
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+}
+
 function createSlotPadTexture(label, isCorrect = false, isHovered = false) {
   const canvas = document.createElement('canvas');
   canvas.width = 512;
   canvas.height = 384;
   const ctx = canvas.getContext('2d');
 
-  let borderColor = 'rgba(0, 229, 255, 0.75)';
-  let textColor = '#38bdf8';
-  let cornerColor = '#00e5ff';
+  let bgOpacity = 0.45;
+  let borderColor = 'rgba(255, 255, 255, 0.15)';
+  let textColor = '#f8fafc';
+  let subtitleColor = '#64748b';
+  let subtitleText = 'DRAG HERE';
 
   if (isCorrect) {
-    borderColor = '#10b981';
+    bgOpacity = 0.55;
+    borderColor = 'rgba(16, 185, 129, 0.7)';
     textColor = '#34d399';
-    cornerColor = '#34d399';
-    // Subtle translucent emerald glow only on verified
-    ctx.fillStyle = 'rgba(16, 185, 129, 0.12)';
+    subtitleColor = '#34d399';
+    subtitleText = '✓ VERIFIED';
+    ctx.fillStyle = 'rgba(16, 185, 129, 0.08)';
     drawRoundedRect(ctx, 16, 16, 480, 352, 28);
     ctx.fill();
   } else if (isHovered) {
-    borderColor = '#38bdf8';
-    textColor = '#ffffff';
-    cornerColor = '#ffffff';
-    ctx.fillStyle = 'rgba(56, 189, 248, 0.18)';
+    bgOpacity = 0.60;
+    borderColor = 'rgba(56, 189, 248, 0.75)';
+    textColor = '#38bdf8';
+    subtitleColor = '#38bdf8';
+    subtitleText = 'RELEASE TO DROP';
+    ctx.fillStyle = 'rgba(56, 189, 248, 0.12)';
     drawRoundedRect(ctx, 16, 16, 480, 352, 28);
     ctx.fill();
   }
 
-  // Glowing boundary outline (center is transparent so grid lines are 100% visible!)
-  ctx.strokeStyle = borderColor;
-  ctx.lineWidth = isHovered || isCorrect ? 6 : 4;
-  drawRoundedRect(ctx, 16, 16, 480, 352, 28);
-  ctx.stroke();
+  // VisionOS Smoked Glass Pad Base
+  drawVisionOSGlass(ctx, 16, 16, 480, 352, 28, {
+    bgAlpha: bgOpacity,
+    borderAlpha: isHovered || isCorrect ? 0.65 : 0.22,
+    shadow: false,
+  });
 
-  // Corner crosshairs on slot pad
-  ctx.strokeStyle = cornerColor;
-  ctx.lineWidth = 6;
-  const ch = 32;
-  // TL
-  ctx.beginPath(); ctx.moveTo(24, 24 + ch); ctx.lineTo(24, 24); ctx.lineTo(24 + ch, 24); ctx.stroke();
-  // TR
-  ctx.beginPath(); ctx.moveTo(488 - ch, 24); ctx.lineTo(488, 24); ctx.lineTo(488, 24 + ch); ctx.stroke();
-  // BL
-  ctx.beginPath(); ctx.moveTo(24, 360 - ch); ctx.lineTo(24, 360); ctx.lineTo(24 + ch, 360); ctx.stroke();
-  // BR
-  ctx.beginPath(); ctx.moveTo(488 - ch, 360); ctx.lineTo(488, 360); ctx.lineTo(488, 360 - ch); ctx.stroke();
-
-  // Slot header text
+  // Etched Slot Label (Apple SF Pro style typography)
   ctx.fillStyle = textColor;
-  ctx.font = 'bold 56px system-ui, -apple-system, sans-serif';
+  ctx.font = 'bold 54px -apple-system, system-ui, BlinkMacSystemFont, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(`SLOT ${label}`, 256, 145);
+  ctx.fillText(`SLOT ${label}`, 256, 150);
 
-  // Status subtitle
-  ctx.font = 'bold 36px system-ui, -apple-system, sans-serif';
-  if (isCorrect) {
-    ctx.fillStyle = '#34d399';
-    ctx.fillText('✓ VERIFIED', 256, 255);
-  } else if (isHovered) {
-    ctx.fillStyle = '#38bdf8';
-    ctx.fillText('DROP TO SWAP', 256, 255);
-  } else {
-    ctx.fillStyle = 'rgba(148, 163, 184, 0.85)';
-    ctx.fillText('STEP ' + label, 256, 255);
-  }
+  // Subtitle
+  ctx.fillStyle = subtitleColor;
+  ctx.font = '600 32px -apple-system, system-ui, BlinkMacSystemFont, sans-serif';
+  ctx.fillText(subtitleText, 256, 250);
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.minFilter = THREE.LinearFilter;
@@ -653,44 +616,49 @@ for (let i = 0; i < SLOT_POSITIONS.length; i++) {
   slotPads.push(padMesh);
 }
 
-// --- Floating Glassmorphic Part Badges ---
+// --- VisionOS Floating Spatial Capsule Badges (Above 3D Parts) ---
 const labels = [];
 function createBadge(text, stepNum) {
   const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 128;
+  canvas.width = 600;
+  canvas.height = 140;
   const ctx = canvas.getContext('2d');
 
-  const bgGrad = ctx.createLinearGradient(0, 0, 0, 128);
-  bgGrad.addColorStop(0, 'rgba(15, 23, 42, 0.85)');
-  bgGrad.addColorStop(1, 'rgba(8, 14, 28, 0.95)');
-  ctx.fillStyle = bgGrad;
-  drawRoundedRect(ctx, 4, 4, 504, 120, 26);
+  // Outer Smoked Glass Capsule
+  drawVisionOSGlass(ctx, 6, 6, 588, 128, 36, { bgAlpha: 0.75, borderAlpha: 0.35, shadow: true });
+
+  // Left Sequence Number Pill
+  const numPillWidth = 100;
+  const numGrad = ctx.createLinearGradient(16, 16, 16, 124);
+  numGrad.addColorStop(0, 'rgba(30, 41, 59, 0.95)');
+  numGrad.addColorStop(1, 'rgba(15, 23, 42, 0.98)');
+  ctx.fillStyle = numGrad;
+  drawRoundedRect(ctx, 16, 16, numPillWidth, 108, 28);
   ctx.fill();
 
-  ctx.strokeStyle = 'rgba(0, 229, 255, 0.4)';
-  ctx.lineWidth = 3;
-  ctx.stroke();
-
-  // Top sheen
-  ctx.beginPath();
-  ctx.moveTo(32, 6);
-  ctx.lineTo(480, 6);
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
   ctx.lineWidth = 2;
+  drawRoundedRect(ctx, 16, 16, numPillWidth, 108, 28);
   ctx.stroke();
 
-  // Text
-  ctx.fillStyle = '#f8fafc';
-  ctx.font = 'bold 36px system-ui, -apple-system, sans-serif';
+  // Number String (e.g. 01, 02)
+  const stepStr = String(stepNum).padStart(2, '0');
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 44px -apple-system, system-ui, BlinkMacSystemFont, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(text, 256, 64);
+  ctx.fillText(stepStr, 16 + numPillWidth / 2, 70);
+
+  // Component Name String
+  ctx.fillStyle = '#f8fafc';
+  ctx.font = '600 34px -apple-system, system-ui, BlinkMacSystemFont, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText(text, 136, 70);
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.minFilter = THREE.LinearFilter;
   const plane = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.22, 0.055),
+    new THREE.PlaneGeometry(0.24, 0.056),
     new THREE.MeshBasicMaterial({
       map: texture,
       transparent: true,
@@ -698,7 +666,7 @@ function createBadge(text, stepNum) {
       side: THREE.DoubleSide,
     })
   );
-  plane.visible = false; // Hidden by default, shown only when hovered/pointed at!
+  plane.visible = false; // Hidden by default, appears on gaze/hover!
   labels.push(plane);
   return plane;
 }
@@ -915,178 +883,235 @@ function getSlotWorldPosition(slotIndex, halfH = 0.04) {
   );
 }
 
-// --- HUD Setup ---
-const hudCanvas = document.createElement('canvas');
-hudCanvas.width = 2048;
-hudCanvas.height = 512;
-const hudCtx = hudCanvas.getContext('2d');
-const hudTexture = new THREE.CanvasTexture(hudCanvas);
-hudTexture.minFilter = THREE.LinearFilter;
+// --- Apple VisionOS Spatial UI Setup ---
+// 1. Main Objective Panel (Floating Upper-Left)
+const objCanvas = document.createElement('canvas');
+objCanvas.width = 1280;
+objCanvas.height = 1080;
+const objCtx = objCanvas.getContext('2d');
+const objTexture = new THREE.CanvasTexture(objCanvas);
+objTexture.minFilter = THREE.LinearFilter;
 
-const hud = new THREE.Mesh(
-  new THREE.PlaneGeometry(1.6, 0.4),
-  new THREE.MeshBasicMaterial({ map: hudTexture, transparent: true })
+const objectivePanel = new THREE.Mesh(
+  new THREE.PlaneGeometry(0.74, 0.62),
+  new THREE.MeshBasicMaterial({ map: objTexture, transparent: true, depthWrite: false })
 );
-hud.position.set(0, 2.2, -2.6);
-scene.add(hud);
+objectivePanel.position.set(-0.78, 1.48, -1.35);
+objectivePanel.rotation.set(-0.04, 0.24, 0);
+objectivePanel.userData.isUI = true;
+scene.add(objectivePanel);
 
-function createButtonTexture(text, bgGradient = ['#0284c7', '#0369a1']) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 192;
-  const ctx = canvas.getContext('2d');
+// Side chevron navigation handle on Objective panel
+const navPillGeo = new THREE.RingGeometry(0.024, 0.032, 32);
+const navPillMat = new THREE.MeshBasicMaterial({
+  color: 0x38bdf8,
+  transparent: true,
+  opacity: 0.7,
+  side: THREE.DoubleSide,
+  depthWrite: false,
+});
+const navPill = new THREE.Mesh(navPillGeo, navPillMat);
+navPill.position.set(0.38, 0.05, 0.01);
+objectivePanel.add(navPill);
 
-  const grad = ctx.createLinearGradient(0, 0, 0, 192);
-  grad.addColorStop(0, bgGradient[0]);
-  grad.addColorStop(1, bgGradient[1]);
-  ctx.fillStyle = grad;
-  drawRoundedRect(ctx, 8, 8, 496, 176, 36);
-  ctx.fill();
+// 2. Sequencing Progress Card (Floating Upper-Right)
+const progCanvas = document.createElement('canvas');
+progCanvas.width = 1000;
+progCanvas.height = 600;
+const progCtx = progCanvas.getContext('2d');
+const progTexture = new THREE.CanvasTexture(progCanvas);
+progTexture.minFilter = THREE.LinearFilter;
 
-  ctx.strokeStyle = 'rgba(0, 242, 254, 0.75)';
-  ctx.lineWidth = 6;
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.moveTo(40, 14);
-  ctx.lineTo(472, 14);
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
-  ctx.lineWidth = 3;
-  ctx.stroke();
-
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 58px system-ui, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(text, 256, 96);
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.minFilter = THREE.LinearFilter;
-  return texture;
-}
-
-const resetBtn = new THREE.Mesh(
-  new THREE.BoxGeometry(0.32, 0.10, 0.03),
-  new THREE.MeshStandardMaterial({
-    map: createButtonTexture('↺ SHUFFLE', ['#0284c7', '#075985']),
-    roughness: 0.3,
-    metalness: 0.2,
-  })
+const progressPanel = new THREE.Mesh(
+  new THREE.PlaneGeometry(0.50, 0.30),
+  new THREE.MeshBasicMaterial({ map: progTexture, transparent: true, depthWrite: false })
 );
-resetBtn.position.set(0.56, -0.06, 0.02);
-resetBtn.userData.isReset = true;
-hud.add(resetBtn);
+progressPanel.position.set(0.72, 1.58, -1.35);
+progressPanel.rotation.set(-0.04, -0.24, 0);
+progressPanel.userData.isUI = true;
+scene.add(progressPanel);
+
+// Shuffle Action Button inside Progress Card
+const shuffleBtn = new THREE.Mesh(
+  new THREE.PlaneGeometry(0.26, 0.075),
+  new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })
+);
+shuffleBtn.position.set(0, -0.065, 0.01);
+shuffleBtn.userData.isReset = true;
+progressPanel.add(shuffleBtn);
+
+// 3. Floating Utility Control Capsule (Upper-Right Lower)
+const utilCanvas = document.createElement('canvas');
+utilCanvas.width = 960;
+utilCanvas.height = 320;
+const utilCtx = utilCanvas.getContext('2d');
+const utilTexture = new THREE.CanvasTexture(utilCanvas);
+utilTexture.minFilter = THREE.LinearFilter;
+
+const utilityPanel = new THREE.Mesh(
+  new THREE.PlaneGeometry(0.48, 0.16),
+  new THREE.MeshBasicMaterial({ map: utilTexture, transparent: true, depthWrite: false })
+);
+utilityPanel.position.set(0.72, 1.34, -1.35);
+utilityPanel.rotation.set(-0.04, -0.24, 0);
+utilityPanel.userData.isUI = true;
+scene.add(utilityPanel);
+
+// Unified references for legacy event handling
+const hud = objectivePanel;
+const resetBtn = shuffleBtn;
 
 let gameState = 'playing';
 
 function updateHUD(correctCount = 0) {
-  hudCtx.clearRect(0, 0, 2048, 512);
+  // 1. RENDER OBJECTIVE PANEL
+  objCtx.clearRect(0, 0, 1280, 1080);
+  drawVisionOSGlass(objCtx, 20, 20, 1240, 1040, 44, { bgAlpha: 0.65, borderAlpha: 0.32, shadow: true });
 
-  // Main Frosted Glass Panel
-  const mainGrad = hudCtx.createLinearGradient(0, 0, 0, 512);
-  mainGrad.addColorStop(0, 'rgba(15, 23, 42, 0.78)');
-  mainGrad.addColorStop(1, 'rgba(8, 12, 24, 0.92)');
-  hudCtx.fillStyle = mainGrad;
-  drawRoundedRect(hudCtx, 20, 20, 2008, 472, 48);
-  hudCtx.fill();
+  // Header status pill
+  objCtx.beginPath();
+  objCtx.arc(76, 84, 8, 0, Math.PI * 2);
+  objCtx.fillStyle = '#00e5ff';
+  objCtx.shadowColor = '#00e5ff';
+  objCtx.shadowBlur = 12;
+  objCtx.fill();
+  objCtx.shadowBlur = 0;
 
-  const borderGrad = hudCtx.createLinearGradient(0, 0, 0, 512);
-  borderGrad.addColorStop(0, 'rgba(0, 229, 255, 0.55)');
-  borderGrad.addColorStop(0.5, 'rgba(0, 229, 255, 0.2)');
-  borderGrad.addColorStop(1, 'rgba(255, 255, 255, 0.05)');
-  hudCtx.strokeStyle = borderGrad;
-  hudCtx.lineWidth = 4;
-  hudCtx.stroke();
+  objCtx.fillStyle = '#94a3b8';
+  objCtx.font = 'bold 24px -apple-system, system-ui, BlinkMacSystemFont, sans-serif';
+  objCtx.textAlign = 'left';
+  objCtx.fillText('OBJECTIVE', 98, 92);
 
-  // Top Light Sheen
-  hudCtx.beginPath();
-  hudCtx.moveTo(80, 26);
-  hudCtx.lineTo(1968, 26);
-  hudCtx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-  hudCtx.lineWidth = 2.5;
-  hudCtx.stroke();
+  // Large Bold Title
+  objCtx.fillStyle = '#ffffff';
+  objCtx.font = 'bold 60px -apple-system, system-ui, BlinkMacSystemFont, sans-serif';
+  objCtx.fillText('Sort Components into', 76, 185);
+  objCtx.fillText('SOP Order (1 → 11)', 76, 260);
 
-  if (correctCount === PARTS.length) {
-    // VICTORY
-    hudCtx.fillStyle = 'rgba(16, 185, 129, 0.2)';
-    drawRoundedRect(hudCtx, 80, 60, 480, 54, 18);
-    hudCtx.fill();
-    hudCtx.strokeStyle = 'rgba(16, 185, 129, 0.6)';
-    hudCtx.lineWidth = 2;
-    hudCtx.stroke();
+  // Secondary Instructional text
+  objCtx.fillStyle = '#94a3b8';
+  objCtx.font = '500 28px -apple-system, system-ui, BlinkMacSystemFont, sans-serif';
+  objCtx.fillText('Drag & drop parts between holographic slots.', 76, 345);
+  objCtx.fillText('Correct placement snaps the component.', 76, 390);
 
-    hudCtx.fillStyle = '#34d399';
-    hudCtx.font = 'bold 28px system-ui, sans-serif';
-    hudCtx.textAlign = 'center';
-    hudCtx.fillText('🏆  SOP ORDER VERIFIED', 320, 96);
+  // Hairline divider
+  objCtx.beginPath();
+  objCtx.moveTo(76, 450);
+  objCtx.lineTo(1204, 450);
+  objCtx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+  objCtx.lineWidth = 2;
+  objCtx.stroke();
 
-    hudCtx.fillStyle = '#f8fafc';
-    hudCtx.font = 'bold 64px system-ui, sans-serif';
-    hudCtx.textAlign = 'left';
-    hudCtx.fillText('MANNEQUIN FULLY EQUIPPED', 80, 210);
+  // Bottom Counter Metric
+  objCtx.beginPath();
+  objCtx.arc(104, 550, 22, 0, Math.PI * 2);
+  objCtx.strokeStyle = 'rgba(56, 189, 248, 0.7)';
+  objCtx.lineWidth = 3;
+  objCtx.stroke();
+  objCtx.beginPath();
+  objCtx.moveTo(104, 536);
+  objCtx.lineTo(104, 550);
+  objCtx.lineTo(114, 550);
+  objCtx.strokeStyle = '#38bdf8';
+  objCtx.lineWidth = 2.5;
+  objCtx.stroke();
 
-    hudCtx.fillStyle = '#94a3b8';
-    hudCtx.font = '500 32px system-ui, sans-serif';
-    hudCtx.fillText('All 11 components placed in flawless SOP donning order.', 80, 275);
+  objCtx.fillStyle = '#ffffff';
+  objCtx.font = 'bold 54px -apple-system, system-ui, BlinkMacSystemFont, sans-serif';
+  objCtx.fillText(`${correctCount} / 11`, 144, 568);
 
-    hudCtx.fillStyle = '#38bdf8';
-    hudCtx.font = '600 28px system-ui, sans-serif';
-    hudCtx.fillText('Select [↺ SHUFFLE] on the right to start a new trial.', 80, 390);
-  } else {
-    // IN PROGRESS
-    hudCtx.fillStyle = 'rgba(56, 189, 248, 0.15)';
-    drawRoundedRect(hudCtx, 80, 56, 380, 50, 16);
-    hudCtx.fill();
-    hudCtx.strokeStyle = 'rgba(56, 189, 248, 0.4)';
-    hudCtx.lineWidth = 2;
-    hudCtx.stroke();
+  objCtx.fillStyle = '#94a3b8';
+  objCtx.font = '500 30px -apple-system, system-ui, BlinkMacSystemFont, sans-serif';
+  objCtx.fillText('Components placed', 340, 568);
 
-    hudCtx.fillStyle = '#38bdf8';
-    hudCtx.font = 'bold 26px system-ui, sans-serif';
-    hudCtx.textAlign = 'center';
-    hudCtx.fillText(`● SEQUENCING PROGRESS`, 270, 90);
-
-    // 11 Progress segments
-    const segStart = 490;
-    const segWidth = 60;
-    const segGap = 8;
-    for (let i = 0; i < PARTS.length; i++) {
-      const sx = segStart + i * (segWidth + segGap);
-      const isSlotCorrect = slotOccupants[i] && slotOccupants[i].userData.part.targetSlot === i;
-      hudCtx.fillStyle = isSlotCorrect ? '#10b981' : 'rgba(255, 255, 255, 0.12)';
-      drawRoundedRect(hudCtx, sx, 72, segWidth, 18, 9);
-      hudCtx.fill();
+  // Abstract Blue Wave Graphic at bottom
+  const waveY = 880;
+  for (let w = 0; w < 3; w++) {
+    objCtx.beginPath();
+    objCtx.moveTo(60, waveY + w * 20);
+    for (let x = 60; x <= 1220; x += 40) {
+      const y = waveY + Math.sin((x * 0.008) + w * 1.5) * 45 + Math.cos(x * 0.004) * 20;
+      objCtx.lineTo(x, y);
     }
+    objCtx.strokeStyle = `rgba(56, 189, 248, ${0.15 + w * 0.08})`;
+    objCtx.lineWidth = 2.5;
+    objCtx.stroke();
+  }
+  objTexture.needsUpdate = true;
 
-    // Title Instruction
-    hudCtx.fillStyle = '#f8fafc';
-    hudCtx.font = 'bold 58px system-ui, sans-serif';
-    hudCtx.textAlign = 'left';
-    hudCtx.fillText('Sort Components into SOP Order (1 → 11)', 80, 220);
+  // 2. RENDER PROGRESS PANEL
+  progCtx.clearRect(0, 0, 1000, 600);
+  drawVisionOSGlass(progCtx, 20, 20, 960, 560, 40, { bgAlpha: 0.68, borderAlpha: 0.32, shadow: true });
 
-    hudCtx.fillStyle = '#94a3b8';
-    hudCtx.font = '500 30px system-ui, sans-serif';
-    hudCtx.fillText('Drag & drop parts between holographic slots. Correct placements equip the mannequin.', 80, 280);
+  // Progress Header
+  progCtx.beginPath();
+  progCtx.arc(66, 76, 7, 0, Math.PI * 2);
+  progCtx.fillStyle = '#00e5ff';
+  progCtx.shadowColor = '#00e5ff';
+  progCtx.shadowBlur = 10;
+  progCtx.fill();
+  progCtx.shadowBlur = 0;
 
-    // Score pill (Bottom Left)
-    hudCtx.fillStyle = 'rgba(255, 255, 255, 0.06)';
-    drawRoundedRect(hudCtx, 80, 350, 420, 84, 20);
-    hudCtx.fill();
-    hudCtx.strokeStyle = 'rgba(0, 229, 255, 0.3)';
-    hudCtx.lineWidth = 2;
-    hudCtx.stroke();
+  progCtx.fillStyle = '#94a3b8';
+  progCtx.font = 'bold 22px -apple-system, system-ui, BlinkMacSystemFont, sans-serif';
+  progCtx.textAlign = 'left';
+  progCtx.fillText('SEQUENCING PROGRESS', 86, 84);
 
-    hudCtx.fillStyle = '#94a3b8';
-    hudCtx.font = 'bold 24px system-ui, sans-serif';
-    hudCtx.textAlign = 'left';
-    hudCtx.fillText('CORRECT SLOTS', 110, 400);
-
-    hudCtx.fillStyle = '#38bdf8';
-    hudCtx.font = 'bold 36px system-ui, sans-serif';
-    hudCtx.fillText(`${correctCount} / ${PARTS.length}`, 330, 400);
+  // 11 Progress Segment Pills
+  const segW = 68;
+  const segH = 14;
+  const segGap = 12;
+  const startX = 60;
+  for (let i = 0; i < PARTS.length; i++) {
+    const px = startX + i * (segW + segGap);
+    const isSlotCorrect = slotOccupants[i] && slotOccupants[i].userData.part.targetSlot === i;
+    progCtx.fillStyle = isSlotCorrect ? '#00e5ff' : 'rgba(51, 65, 85, 0.5)';
+    if (isSlotCorrect) {
+      progCtx.shadowColor = '#00e5ff';
+      progCtx.shadowBlur = 8;
+    }
+    drawRoundedRect(progCtx, px, 140, segW, segH, 7);
+    progCtx.fill();
+    progCtx.shadowBlur = 0;
   }
 
-  hudTexture.needsUpdate = true;
+  // Large Pill-Shaped SHUFFLE Button
+  const btnX = 260;
+  const btnY = 360;
+  const btnW = 480;
+  const btnH = 120;
+  drawVisionOSGlass(progCtx, btnX, btnY, btnW, btnH, 60, { bgAlpha: 0.8, borderAlpha: 0.35, shadow: true });
+
+  // Shuffle Icon & Text
+  progCtx.fillStyle = '#ffffff';
+  progCtx.font = 'bold 44px -apple-system, system-ui, BlinkMacSystemFont, sans-serif';
+  progCtx.textAlign = 'center';
+  progCtx.textBaseline = 'middle';
+  progCtx.fillText('↝  SHUFFLE', btnX + btnW / 2, btnY + btnH / 2);
+  progTexture.needsUpdate = true;
+
+  // 3. RENDER FLOATING UTILITY CONTROLS
+  utilCtx.clearRect(0, 0, 960, 320);
+  drawVisionOSGlass(utilCtx, 16, 16, 928, 288, 36, { bgAlpha: 0.68, borderAlpha: 0.32, shadow: true });
+
+  const controls = [
+    { icon: '↺', label: 'RESET', x: 160 },
+    { icon: '💡', label: 'HINT', x: 480 },
+    { icon: 'ⓘ', label: 'INFO', x: 800 },
+  ];
+
+  for (const c of controls) {
+    utilCtx.fillStyle = '#ffffff';
+    utilCtx.font = '36px -apple-system, system-ui, BlinkMacSystemFont, sans-serif';
+    utilCtx.textAlign = 'center';
+    utilCtx.textBaseline = 'middle';
+    utilCtx.fillText(c.icon, c.x, 110);
+
+    utilCtx.font = 'bold 22px -apple-system, system-ui, BlinkMacSystemFont, sans-serif';
+    utilCtx.fillStyle = '#94a3b8';
+    utilCtx.fillText(c.label, c.x, 190);
+  }
+  utilTexture.needsUpdate = true;
 }
 
 // --- Shuffling, Jumbling, and Holographic Forming Animation ---
@@ -1322,8 +1347,10 @@ function pickFromRay(origin, direction) {
   const targets = [
     ...allPartMeshes,
     ...slotPads,
-    resetBtn,
-    hud,
+    shuffleBtn,
+    objectivePanel,
+    progressPanel,
+    utilityPanel,
     mannequinRotateRing,
     mannequinCollider,
     mannequinRing,
@@ -1406,13 +1433,18 @@ function onVRSelectStart(controller) {
   if (!hitData) return;
   const hit = hitData.object;
 
-  if (hit === resetBtn) {
+  if (hit === shuffleBtn || hit?.userData?.isReset) {
     shuffleAndAssign();
     return;
   }
 
-  if (hit === hud) {
-    grabbedUI = hud;
+  if (hit === utilityPanel) {
+    shuffleAndAssign();
+    return;
+  }
+
+  if (hit === objectivePanel || hit === progressPanel) {
+    grabbedUI = hit;
     uiGrabController = controller;
     uiGrabDist = Math.max(0.6, hitData.distance);
     return;
@@ -1827,10 +1859,16 @@ renderer.domElement.addEventListener('pointerdown', (e) => {
   const hitData = pickFromRay(raycaster.ray.origin, raycaster.ray.direction);
   const hit = hitData ? hitData.object : null;
 
-  if (hit === resetBtn) {
+  if (hit === shuffleBtn || hit === resetBtn || hit?.userData?.isReset) {
     shuffleAndAssign();
-  } else if (hit === hud) {
+  } else if (hit === progressPanel) {
+    // If clicked on lower region of progress panel (shuffle button)
+    shuffleAndAssign();
+  } else if (hit === utilityPanel) {
+    shuffleAndAssign();
+  } else if (hit === objectivePanel) {
     isDraggingUI = true;
+    grabbedUI = objectivePanel;
   } else if (
     e.button === 2 ||
     (e.button === 0 && e.shiftKey) ||
@@ -1866,6 +1904,7 @@ addEventListener('pointerup', (e) => {
 
   if (isDraggingUI) {
     isDraggingUI = false;
+    grabbedUI = null;
   }
 
   if (isDraggingMannequin) {
@@ -1899,13 +1938,13 @@ renderer.domElement.addEventListener('pointermove', (e) => {
   if (renderer.xr.isPresenting) return;
   updateMouseRay(e);
 
-  if (isDraggingUI) {
-    const panelNormal = new THREE.Vector3().subVectors(camera.position, hud.position).normalize();
-    dragPlane.setFromNormalAndCoplanarPoint(panelNormal, hud.position);
+  if (isDraggingUI && grabbedUI) {
+    const panelNormal = new THREE.Vector3().subVectors(camera.position, grabbedUI.position).normalize();
+    dragPlane.setFromNormalAndCoplanarPoint(panelNormal, grabbedUI.position);
     const panelPoint = new THREE.Vector3();
     if (raycaster.ray.intersectPlane(dragPlane, panelPoint)) {
-      hud.position.copy(panelPoint);
-      hud.lookAt(camera.position);
+      grabbedUI.position.copy(panelPoint);
+      grabbedUI.lookAt(camera.position);
     }
     return;
   }
