@@ -737,6 +737,19 @@ function loadGLBModels() {
             clone.position.set(child.position.x - refX, child.position.y, child.position.z - refZ);
             clone.quaternion.copy(child.quaternion);
             clone.scale.copy(child.scale);
+            if (partId === 'cooling') {
+              clone.scale.multiplyScalar(1.006);
+              clone.traverse((c) => {
+                if (c.isMesh) {
+                  c.material = c.material.clone();
+                  c.material.polygonOffset = true;
+                  c.material.polygonOffsetFactor = -1.0;
+                  c.material.polygonOffsetUnits = -1.0;
+                  c.material.depthWrite = true;
+                  c.renderOrder = 2;
+                }
+              });
+            }
             clone.visible = true;
             mannequinMesh.add(clone);
             mannequinMesh.userData.hasCustomModel = true;
