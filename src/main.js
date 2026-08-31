@@ -695,8 +695,9 @@ function loadGLBModels() {
       });
 
       // 1. Process MANNEQUIN_body (supports Group and Mesh)
-      gltf.scene.children.forEach((child) => {
-        if (child.name && child.name.startsWith('MANNEQUIN')) {
+      gltf.scene.traverse((child) => {
+        if (child.name && child.name.startsWith('MANNEQUIN') && !child.userData._processed) {
+          child.userData._processed = true;
           proceduralMannequinGroup.visible = false;
           const bodyClone = child.clone();
           bodyClone.position.set(child.position.x - refX, child.position.y, child.position.z - refZ);
@@ -708,10 +709,13 @@ function loadGLBModels() {
       });
 
       // 2. Process EQUIPPED_ nodes (fitted suit on mannequin)
-      gltf.scene.children.forEach((child) => {
-        if (child.name && (child.name.startsWith('EQUIPPED_') || child.name.startsWith('FIT_'))) {
+      gltf.scene.traverse((child) => {
+        if (child.name && (child.name.startsWith('EQUIPPED_') || child.name.startsWith('FIT_')) && !child.userData._processed) {
+          child.userData._processed = true;
           let partId = child.name.replace('EQUIPPED_', '').replace('FIT_', '');
           if (partId === 'trousers.001') partId = 'pem';
+          if (partId === 'jacket' || partId === 'jacketFront') partId = 'frontPanel';
+          if (partId === 'jacketRear' || partId === 'jacketBack') partId = 'rearPanel';
 
           const mannequinMesh = mannequinClones.get(partId);
           if (mannequinMesh) {
@@ -735,14 +739,20 @@ function loadGLBModels() {
             clone.scale.copy(child.scale);
             clone.visible = true;
             mannequinMesh.add(clone);
+            mannequinMesh.userData.hasCustomModel = true;
+            console.log('✅ Mounted EQUIPPED model:', partId);
           }
         }
       });
 
       // 3. Process PART_ nodes (table slot models)
-      gltf.scene.children.forEach((child) => {
-        if (child.name && child.name.startsWith('PART_')) {
-          const partId = child.name.replace('PART_', '');
+      gltf.scene.traverse((child) => {
+        if (child.name && child.name.startsWith('PART_') && !child.userData._processed) {
+          child.userData._processed = true;
+          let partId = child.name.replace('PART_', '');
+          if (partId === 'jacket' || partId === 'jacketFront') partId = 'frontPanel';
+          if (partId === 'jacketRear' || partId === 'jacketBack') partId = 'rearPanel';
+
           const gridMesh = partsById.get(partId);
           if (gridMesh) {
             while (gridMesh.children.length > 0) {
@@ -783,6 +793,31 @@ function loadGLBModels() {
           }
         }
       });
+
+      // 4. Graceful Fallback: ensure no procedural cubes/spheres remain on the mannequin
+      for (const part of PARTS) {
+        const mannequinMesh = mannequinClones.get(part.id);
+        if (mannequinMesh && !mannequinMesh.userData.hasCustomModel) {
+          const tablePartMesh = partsById.get(part.id);
+          if (tablePartMesh && tablePartMesh.children.length > 0) {
+            mannequinMesh.geometry.dispose();
+            mannequinMesh.geometry = new THREE.BufferGeometry();
+            mannequinMesh.material = new THREE.MeshBasicMaterial({ visible: false });
+            while (mannequinMesh.children.length > 0) {
+              mannequinMesh.remove(mannequinMesh.children[0]);
+            }
+            const fallbackClone = tablePartMesh.children[0].clone();
+            const anchor = new THREE.Vector3(...ANCHORS[part.anchor]);
+            const offset = new THREE.Vector3(...part.mannequinOffset);
+            mannequinMesh.position.copy(anchor).add(offset);
+            mannequinMesh.scale.setScalar(1.15);
+            fallbackClone.visible = true;
+            mannequinMesh.add(fallbackClone);
+            mannequinMesh.userData.hasCustomModel = true;
+            console.log('ℹ️ Used table 3D model fallback on mannequin for:', part.id);
+          }
+        }
+      }
 
       // Update target positions for current slots with new geometry half-heights
       for (const mesh of allPartMeshes) {
