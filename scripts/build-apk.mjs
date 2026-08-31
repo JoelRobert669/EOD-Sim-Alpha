@@ -74,8 +74,8 @@ android {
         applicationId "com.eod.suittrainer"
         minSdkVersion 26
         targetSdkVersion 32
-        versionCode 13
-        versionName "2.2.0"
+        versionCode 14
+        versionName "2.3.0"
     }
 
     androidResources {
@@ -456,7 +456,7 @@ public class MainActivity extends Activity {
   const zOutputDir = "Z:/Media/Projects/Misc/XR/apk";
   try {
     fs.mkdirSync(zOutputDir, { recursive: true });
-    const zDest = path.join(zOutputDir, "eod-suit-trainer-v2.2.0.apk");
+    const zDest = path.join(zOutputDir, "eod-suit-trainer-v2.3.0.apk");
     fs.copyFileSync(finalApk, zDest);
     console.log("  ✅ Copied to Z: drive:", zDest);
   } catch (zErr) {
@@ -464,7 +464,7 @@ public class MainActivity extends Activity {
   }
 
   console.log("\n======================================================");
-  console.log("🎉 META QUEST APK v2.2.0 — READY!");
+  console.log("🎉 META QUEST APK v2.3.0 — READY!");
   console.log("📁 Location:", finalApk);
   console.log("📦 Size:", (stats.size / (1024 * 1024)).toFixed(2), "MB");
   console.log("🎯 Native Target: com.oculus.browser (Meta Quest Browser)");

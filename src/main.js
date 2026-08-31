@@ -740,17 +740,18 @@ function loadGLBModels() {
             if (partId === 'cooling') {
               clone.scale.multiplyScalar(1.008);
               clone.traverse((c) => {
-                if (c.isMesh) {
-                  c.material = new THREE.MeshStandardMaterial({
-                    color: 0x1f4e79,
-                    roughness: 0.55,
-                    metalness: 0.2,
-                    polygonOffset: true,
-                    polygonOffsetFactor: -2.0,
-                    polygonOffsetUnits: -2.0,
-                    depthWrite: true,
-                    side: THREE.DoubleSide
-                  });
+                if (c.isMesh && c.material) {
+                  const mats = Array.isArray(c.material) ? c.material : [c.material];
+                  for (const m of mats) {
+                    m.polygonOffset = true;
+                    m.polygonOffsetFactor = -2.0;
+                    m.polygonOffsetUnits = -2.0;
+                    m.depthWrite = true;
+                    m.side = THREE.DoubleSide;
+                    if (m.color && (m.color.r < 0.08 && m.color.g < 0.08 && m.color.b < 0.2)) {
+                      m.color.setHex(0x24558e);
+                    }
+                  }
                   c.renderOrder = 2;
                 }
               });
@@ -783,13 +784,14 @@ function loadGLBModels() {
 
             if (partId === 'cooling') {
               clone.traverse((c) => {
-                if (c.isMesh) {
-                  c.material = new THREE.MeshStandardMaterial({
-                    color: 0x1f4e79,
-                    roughness: 0.55,
-                    metalness: 0.2,
-                    side: THREE.DoubleSide
-                  });
+                if (c.isMesh && c.material) {
+                  const mats = Array.isArray(c.material) ? c.material : [c.material];
+                  for (const m of mats) {
+                    m.side = THREE.DoubleSide;
+                    if (m.color && (m.color.r < 0.08 && m.color.g < 0.08 && m.color.b < 0.2)) {
+                      m.color.setHex(0x24558e);
+                    }
+                  }
                 }
               });
             }
