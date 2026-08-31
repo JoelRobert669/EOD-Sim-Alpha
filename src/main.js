@@ -740,12 +740,23 @@ function loadGLBModels() {
             if (partId === 'cooling') {
               clone.scale.multiplyScalar(1.006);
               clone.traverse((c) => {
-                if (c.isMesh) {
-                  c.material = c.material.clone();
-                  c.material.polygonOffset = true;
-                  c.material.polygonOffsetFactor = -1.0;
-                  c.material.polygonOffsetUnits = -1.0;
-                  c.material.depthWrite = true;
+                if (c.isMesh && c.material) {
+                  if (Array.isArray(c.material)) {
+                    c.material = c.material.map(m => {
+                      const cloned = m.clone();
+                      cloned.polygonOffset = true;
+                      cloned.polygonOffsetFactor = -1.0;
+                      cloned.polygonOffsetUnits = -1.0;
+                      cloned.depthWrite = true;
+                      return cloned;
+                    });
+                  } else {
+                    c.material = c.material.clone();
+                    c.material.polygonOffset = true;
+                    c.material.polygonOffsetFactor = -1.0;
+                    c.material.polygonOffsetUnits = -1.0;
+                    c.material.depthWrite = true;
+                  }
                   c.renderOrder = 2;
                 }
               });
