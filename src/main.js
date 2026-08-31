@@ -738,25 +738,19 @@ function loadGLBModels() {
             clone.quaternion.copy(child.quaternion);
             clone.scale.copy(child.scale);
             if (partId === 'cooling') {
-              clone.scale.multiplyScalar(1.006);
+              clone.scale.multiplyScalar(1.008);
               clone.traverse((c) => {
-                if (c.isMesh && c.material) {
-                  if (Array.isArray(c.material)) {
-                    c.material = c.material.map(m => {
-                      const cloned = m.clone();
-                      cloned.polygonOffset = true;
-                      cloned.polygonOffsetFactor = -1.0;
-                      cloned.polygonOffsetUnits = -1.0;
-                      cloned.depthWrite = true;
-                      return cloned;
-                    });
-                  } else {
-                    c.material = c.material.clone();
-                    c.material.polygonOffset = true;
-                    c.material.polygonOffsetFactor = -1.0;
-                    c.material.polygonOffsetUnits = -1.0;
-                    c.material.depthWrite = true;
-                  }
+                if (c.isMesh) {
+                  c.material = new THREE.MeshStandardMaterial({
+                    color: 0x1f4e79,
+                    roughness: 0.6,
+                    metalness: 0.15,
+                    polygonOffset: true,
+                    polygonOffsetFactor: -2.0,
+                    polygonOffsetUnits: -2.0,
+                    depthWrite: true,
+                    side: THREE.DoubleSide
+                  });
                   c.renderOrder = 2;
                 }
               });
@@ -786,6 +780,19 @@ function loadGLBModels() {
             const clone = child.clone();
             clone.position.set(0, 0, 0);
             clone.rotation.set(0, 0, 0);
+
+            if (partId === 'cooling') {
+              clone.traverse((c) => {
+                if (c.isMesh) {
+                  c.material = new THREE.MeshStandardMaterial({
+                    color: 0x1f4e79,
+                    roughness: 0.6,
+                    metalness: 0.15,
+                    side: THREE.DoubleSide
+                  });
+                }
+              });
+            }
 
             // Center geometry inside carrier box
             const bbox = new THREE.Box3().setFromObject(clone);
